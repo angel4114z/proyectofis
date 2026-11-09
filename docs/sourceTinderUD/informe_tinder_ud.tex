@@ -1,0 +1,1058 @@
+\documentclass[11pt,a4paper]{article}
+
+% ===================== PAQUETES =====================
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage[T1]{fontenc}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{colortbl}
+\usepackage{float}
+\usepackage{verbatim}
+\usepackage{hyperref}
+
+\renewcommand{\arraystretch}{1.3}
+
+% =========================================================
+% SISTEMA DE CARPETAS PARA LAS IMÁGENES
+% =========================================================
+% Todas las imágenes (PNG) van dentro de la carpeta "figuras/":
+%
+%   figuras/logo/LogoUni.png
+%   figuras/casos_uso/diagrama_casos_uso.png
+%   figuras/secuencia/CU-C01_secuencia.png ... CU-C07_secuencia.png
+%   figuras/comunicacion/CU-C01_comunicacion.png ... CU-C07_comunicacion.png
+%
+% Basta con subir cada PNG a su carpeta con el nombre indicado; no hay
+% que modificar este archivo. Si una imagen aún no existe, el documento
+% compila igual y muestra un recuadro con la ruta esperada.
+\graphicspath{{./}{figuras/}}
+
+% ===================== LOGO (opcional) =====================
+\newcommand{\LogoUni}{%
+    \IfFileExists{figuras/logo/LogoUni.png}{%
+        \includegraphics[width=0.35\textwidth]{figuras/logo/LogoUni.png}\\[1cm]%
+    }{}%
+}
+
+% ===================== COMANDO PARA TABLA DE CASO DE USO =====================
+% Uso:
+% \CasoUso{Nombre}{ID}{Actores}{Descripcion}{Precondicion}{Primario}{Alternativo}{Excepcional}
+
+\newcommand{\CasoUso}[8]{
+\begin{center}
+\begin{tabularx}{\textwidth}{|l|X|}
+\hline
+\rowcolor{gray!25}
+\multicolumn{2}{|c|}{\textbf{Caso de Uso: #1}} \\
+\hline
+\textbf{ID} & #2 \\
+\hline
+\textbf{Actor(es)} & #3 \\
+\hline
+\textbf{Descripción} & #4 \\
+\hline
+\textbf{Precondición} & #5 \\
+\hline
+\rowcolor{gray!15}
+\multicolumn{2}{|c|}{\textbf{Escenarios}} \\
+\hline
+\textbf{Principal} & #6 \\
+\hline
+\textbf{Alternativo(s)} & #7 \\
+\hline
+\textbf{Excepcional(es)} & #8 \\
+\hline
+\end{tabularx}
+\end{center}
+\vspace{0.5cm}
+}
+
+% ===================== COMANDO PARA INSERTAR DIAGRAMAS =====================
+% Uso: \Diagrama{ruta/imagen.png}{etiqueta}{Leyenda}
+% Si la imagen todavía no existe, se muestra un recuadro de espacio reservado.
+\newcommand{\Diagrama}[3]{
+\begin{figure}[H]
+    \centering
+    \IfFileExists{#1}{%
+        \includegraphics[width=\textwidth,height=0.72\textheight,keepaspectratio]{#1}%
+    }{%
+        \fbox{\parbox[c][0.35\textheight][c]{0.85\textwidth}{\centering
+        \textit{Insertar aquí la imagen del diagrama}\\[0.4em]
+        \texttt{\detokenize{#1}}}}%
+    }
+    \caption{#3}
+    \label{#2}
+\end{figure}
+}
+
+% ===================== COMANDO PARA FICHA DE DIAGRAMA =====================
+% Uso: \Ficha{ID}{Caso de uso}{Participantes}{Escenarios representados}{Elementos de UML usados}
+\newcommand{\Ficha}[5]{
+\begin{center}
+\begin{tabularx}{\textwidth}{|l|X|}
+\hline
+\rowcolor{gray!25}
+\multicolumn{2}{|c|}{\textbf{#1 -- #2}} \\
+\hline
+\textbf{Participantes} & #3 \\
+\hline
+\textbf{Escenarios representados} & #4 \\
+\hline
+\textbf{Elementos UML} & #5 \\
+\hline
+\end{tabularx}
+\end{center}
+}
+
+% ===================== PORTADA =====================
+
+\title{
+
+    \LogoUni
+    \textbf{Análisis y Especificación de Casos de Uso\\
+    y Diagramas de Interacción}\\
+    \vspace{0.5cm}
+    \large Tinder UD
+    \vspace{0.3cm}
+}
+
+\author{
+    \vspace{0.7cm}
+    \textbf{Autores:}\\
+    Angel Andres Diaz Vergara 20231020056\\ Gabriel Fernando Lozano Echeverry - 20232020105\\
+    Juan Camilo Mosquera Palomino - 20241020120\\[1.5em]
+    \vspace{0.7cm}
+    \textbf{Profesor:}\\
+    Sandro Javier Bolaños Castro\\[1.5em]
+    \vspace{0.7cm}
+    \textbf{Asignatura:}\\
+    Fundamentos de ingeniería de software\\[1.5em]
+    \vspace{0.7cm}
+    \textbf{Universidad:}\\
+    Universidad Distrital Francisco José de Caldas\\
+    Facultad de Ingeniería\\
+    Bogotá D.C., Colombia\\[1em]
+}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+
+\newpage
+
+% =========================================================
+% PARTE I. ANÁLISIS Y ESPECIFICACIÓN DE CASOS DE USO
+% =========================================================
+
+\part{Análisis y Especificación de Casos de Uso}
+
+% ---------------------------------------------------------
+% 1. PLANTEAMIENTO
+% ---------------------------------------------------------
+
+\section{Planteamiento del Software}
+
+La propuesta consiste en desarrollar una aplicación de interacción social orientada
+exclusivamente a estudiantes de una comunidad universitaria. La aplicación busca
+facilitar que los estudiantes conozcan otras personas pertenecientes a la misma
+universidad y encuentren posibles afinidades a partir de sus intereses y de la
+información que cada usuario decida compartir.
+
+El sistema permitirá que cada estudiante cree un perfil personal en el que pueda
+agregar fotografías, una biografía, etiquetas relacionadas con sus intereses y
+información académica básica, como la facultad y la sede a la que pertenece.
+
+A partir de estos perfiles, los estudiantes podrán explorar otras personas y
+encontrar aquellas que compartan intereses o características de su preferencia.
+Cuando exista interés mutuo entre dos estudiantes, se establecerá una conexión
+(\textit{match}), después de la cual se habilitará un canal de comunicación mediante
+un chat.
+
+La aplicación también contempla mecanismos básicos de seguridad para que los
+usuarios puedan bloquear o reportar a otros estudiantes cuando consideren que una
+interacción no es apropiada.
+
+% ---------------------------------------------------------
+% 2. PROPÓSITO
+% ---------------------------------------------------------
+
+\section{Propósito}
+
+El propósito principal de la aplicación es facilitar la conexión entre estudiantes
+de una misma comunidad universitaria, proporcionando un espacio en el que puedan
+conocerse, identificar intereses en común y establecer comunicación cuando exista
+interés mutuo.
+
+El sistema busca que el proceso de conocer nuevas personas sea sencillo y esté
+centrado en la información que los propios estudiantes decidan compartir sobre sí
+mismos.
+
+Para ello, la aplicación permitirá crear perfiles personales, explorar perfiles
+de otros estudiantes, encontrar personas con intereses afines, establecer
+conexiones y comunicarse mediante un chat.
+
+Además, se busca proporcionar mecanismos básicos que permitan al usuario controlar
+sus interacciones mediante las opciones de bloqueo y reporte.
+
+% ---------------------------------------------------------
+% 3. JUSTIFICACIÓN
+% ---------------------------------------------------------
+
+\section{Justificación}
+
+Dentro de una comunidad universitaria existe una gran cantidad de estudiantes que
+pertenecen a diferentes facultades, programas académicos y sedes. Aunque todos
+forman parte de una misma comunidad, las actividades académicas y la distribución
+de los estudiantes pueden dificultar que algunas personas conozcan a otras con
+intereses similares.
+
+La aplicación propuesta busca brindar una alternativa para facilitar este proceso,
+permitiendo que los estudiantes conozcan personas de la misma universidad a partir
+de información básica como sus intereses, biografía, fotografías, facultad y sede.
+
+A diferencia de una aplicación de citas general, el sistema estará orientado a una
+comunidad universitaria específica. Por esta razón, no se considera necesario
+utilizar la ubicación geográfica como criterio principal. En su lugar, la
+pertenencia a la universidad y la información relacionada con la facultad o sede
+permitirán establecer el contexto de los usuarios.
+
+La propuesta también contempla funciones de seguridad básicas, como bloquear y
+reportar usuarios, con el objetivo de proporcionar mecanismos para controlar
+interacciones no deseadas.
+
+% ---------------------------------------------------------
+% 4. ALCANCE
+% ---------------------------------------------------------
+
+\section{Alcance del Sistema}
+
+El sistema estará orientado a estudiantes pertenecientes a la comunidad
+universitaria.
+
+Dentro del alcance inicial de la aplicación se encuentran las siguientes
+funcionalidades:
+
+\begin{itemize}
+    \item Creación y gestión de una cuenta de usuario.
+    \item Creación y edición de un perfil personal.
+    \item Carga y eliminación de fotografías.
+    \item Registro de una biografía.
+    \item Registro de intereses mediante etiquetas.
+    \item Información relacionada con la facultad y sede del estudiante.
+    \item Exploración de perfiles de otros estudiantes.
+    \item Búsqueda de personas con intereses afines.
+    \item Aplicación de filtros relacionados con los perfiles.
+    \item Expresión de interés hacia otro estudiante.
+    \item Establecimiento de una conexión cuando existe interés mutuo.
+    \item Comunicación mediante un chat después de establecer una conexión.
+    \item Bloqueo de otros usuarios.
+    \item Reporte de otros usuarios.
+\end{itemize}
+
+La propuesta no contempla inicialmente funcionalidades relacionadas con la
+ubicación geográfica precisa de los usuarios, sistemas de pago, publicidad,
+historias, contenido multimedia avanzado ni mecanismos de recomendación basados
+en algoritmos complejos.
+
+% ---------------------------------------------------------
+% 5. ACTOR PRINCIPAL
+% ---------------------------------------------------------
+
+\section{Actor Principal}
+
+\subsection{Estudiante}
+
+El estudiante es el actor principal del sistema. Es la persona que utiliza la
+aplicación para conocer otros estudiantes, compartir información sobre sí mismo,
+buscar personas afines, establecer conexiones y comunicarse con aquellas personas
+con las que haya establecido un \textit{match}.
+
+El estudiante también puede administrar su cuenta y utilizar las funciones de
+seguridad disponibles para bloquear o reportar a otros usuarios.
+
+% ---------------------------------------------------------
+% 6. IDENTIFICACIÓN DE CASOS DE USO
+% ---------------------------------------------------------
+
+\section{Identificación de Casos de Uso}
+
+Los casos de uso se identifican desde una perspectiva orientada a los objetivos
+del usuario y a la finalidad general del sistema.
+
+Por lo tanto, los casos de uso no representan operaciones técnicas específicas de
+la aplicación, sino las necesidades y objetivos que el estudiante busca alcanzar
+mediante el uso del sistema.
+
+El caso de uso principal identificado para la aplicación es
+\textit{Facilitar la conexión entre estudiantes}. Los demás casos de uso
+representan objetivos que permiten alcanzar o complementar dicha finalidad.
+
+% ---------------------------------------------------------
+% 7. TABLA GENERAL DE CASOS DE USO
+% ---------------------------------------------------------
+
+\section{Casos de Uso Identificados}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{|c|X|X|X|}
+\hline
+\rowcolor{gray!25}
+\textbf{ID} &
+\textbf{Nombre del Caso de Uso} &
+\textbf{Actor Principal} &
+\textbf{Descripción} \\
+\hline
+
+CU-C01 &
+\textbf{Facilitar la conexión entre estudiantes} &
+Estudiante &
+Permitir que los estudiantes conozcan personas de su comunidad universitaria y establezcan conexiones con aquellas que consideren afines. \\
+\hline
+
+CU-C02 &
+\textbf{Presentarse ante otros estudiantes} &
+Estudiante &
+Permitir que el estudiante comparta información sobre sí mismo, como fotografías, biografía, intereses, facultad y sede. \\
+\hline
+
+CU-C03 &
+\textbf{Encontrar personas afines} &
+Estudiante &
+Permitir que el estudiante explore y encuentre otros estudiantes de acuerdo con sus intereses y características de preferencia. \\
+\hline
+
+CU-C04 &
+\textbf{Establecer una conexión} &
+Estudiante &
+Permitir que dos estudiantes establezcan una conexión cuando existe interés mutuo. \\
+\hline
+
+CU-C05 &
+\textbf{Comunicarse con una conexión} &
+Estudiante &
+Permitir que los estudiantes que han establecido una conexión se comuniquen mediante un chat. \\
+\hline
+
+CU-C06 &
+\textbf{Proteger la interacción} &
+Estudiante &
+Permitir que el estudiante bloquee o reporte a otros usuarios para controlar interacciones no deseadas o inapropiadas. \\
+\hline
+
+CU-C07 &
+\textbf{Gestionar el acceso a la aplicación} &
+Estudiante &
+Permitir que el estudiante cree, acceda y gestione su cuenta dentro de la aplicación. \\
+\hline
+
+\end{tabularx}
+\end{center}
+
+% ---------------------------------------------------------
+% 8. DIAGRAMA DE CASOS DE USO
+% ---------------------------------------------------------
+
+\section{Diagrama de Casos de Uso}
+
+El diagrama de casos de uso representa la relación entre el actor principal y los
+objetivos identificados para el sistema.
+
+\Diagrama{figuras/casos_uso/diagrama_casos_uso.png}{fig:casos_uso}{Diagrama de casos de uso de Tinder UD}
+
+% ---------------------------------------------------------
+% 9. DESCRIPCIÓN DETALLADA DE CASOS DE USO
+% ---------------------------------------------------------
+
+\section{Descripción de Casos de Uso}
+
+A continuación se describen los casos de uso desde la perspectiva del estudiante,
+manteniendo el enfoque en los objetivos que busca alcanzar mediante la aplicación.
+
+% ---------- CU-C01 ----------
+
+\CasoUso
+{Facilitar la conexión entre estudiantes}
+{CU-C01}
+{Estudiante}
+{El estudiante utiliza la aplicación con el propósito de conocer otros estudiantes
+de la comunidad universitaria y establecer conexiones con personas que considere
+afines.}
+{El estudiante debe pertenecer a la comunidad universitaria y tener acceso a la
+aplicación.}
+{
+1. El estudiante accede a la aplicación. \newline
+2. Consulta información de otros estudiantes. \newline
+3. Encuentra personas que considera afines a sus intereses. \newline
+4. Expresa interés en establecer una conexión. \newline
+5. Cuando existe interés mutuo, se establece una conexión. \newline
+6. El estudiante puede comunicarse con la persona conectada.
+}
+{
+1. El estudiante puede continuar explorando perfiles sin establecer una conexión.
+\newline
+2. Puede modificar sus preferencias para encontrar otros perfiles.
+}
+{
+1. No existen perfiles que coincidan con las preferencias del estudiante. \newline
+2. El perfil de otro estudiante deja de estar disponible. \newline
+3. El estudiante no puede completar la interacción.
+}
+
+% ---------- CU-C02 ----------
+
+\CasoUso
+{Presentarse ante otros estudiantes}
+{CU-C02}
+{Estudiante}
+{El estudiante comparte información sobre sí mismo para permitir que otros usuarios
+conozcan sus características, intereses y aspectos que considere relevantes.}
+{El estudiante debe tener una cuenta dentro de la aplicación.}
+{
+1. El estudiante accede a su perfil. \newline
+2. Agrega una o varias fotografías. \newline
+3. Escribe una biografía. \newline
+4. Selecciona etiquetas relacionadas con sus intereses. \newline
+5. Indica información relacionada con su facultad y sede. \newline
+6. Guarda la información del perfil.
+}
+{
+1. El estudiante puede modificar posteriormente la información de su perfil. \newline
+2. Puede eliminar fotografías o modificar sus intereses. \newline
+3. Puede decidir qué información desea mantener en su perfil.
+}
+{
+1. El estudiante intenta guardar información incompleta cuando existen datos
+requeridos. \newline
+2. Una fotografía no puede ser agregada al perfil. \newline
+3. La información proporcionada no es válida.
+}
+
+% ---------- CU-C03 ----------
+
+\CasoUso
+{Encontrar personas afines}
+{CU-C03}
+{Estudiante}
+{El estudiante busca otros estudiantes que puedan ser de su interés a partir de la
+información disponible en sus perfiles y de sus preferencias.}
+{El estudiante debe haber accedido a la aplicación y contar con un perfil.}
+{
+1. El estudiante accede a la sección de exploración. \newline
+2. Consulta los perfiles disponibles. \newline
+3. Utiliza sus preferencias para encontrar personas de interés. \newline
+4. Puede utilizar criterios como intereses, facultad o sede. \newline
+5. Consulta los perfiles que cumplen con sus criterios. \newline
+6. Decide si desea establecer una conexión con alguno de ellos.
+}
+{
+1. El estudiante puede realizar la búsqueda sin aplicar filtros específicos. \newline
+2. Puede modificar sus criterios para obtener otros resultados. \newline
+3. Puede continuar explorando perfiles diferentes.
+}
+{
+1. No existen perfiles que coincidan con los criterios seleccionados. \newline
+2. Los perfiles disponibles no contienen información suficiente para aplicar
+determinados criterios.
+}
+
+% ---------- CU-C04 ----------
+
+\CasoUso
+{Establecer una conexión}
+{CU-C04}
+{Estudiante}
+{El estudiante establece una conexión con otro estudiante cuando ambos expresan
+interés de manera mutua.}
+{El estudiante debe haber encontrado un perfil con el que desea establecer una
+posible conexión.}
+{
+1. El estudiante expresa interés en otro perfil. \newline
+2. El otro estudiante también expresa interés. \newline
+3. Se identifica que existe interés mutuo. \newline
+4. Se establece una conexión entre ambos estudiantes. \newline
+5. Se habilita la posibilidad de comunicación entre los estudiantes conectados.
+}
+{
+1. El estudiante puede continuar explorando otros perfiles después de expresar
+interés. \newline
+2. El estudiante puede establecer conexiones con diferentes usuarios.
+}
+{
+1. No existe interés mutuo. \newline
+2. Uno de los perfiles deja de estar disponible antes de establecer la conexión.
+}
+
+% ---------- CU-C05 ----------
+
+\CasoUso
+{Comunicarse con una conexión}
+{CU-C05}
+{Estudiante}
+{El estudiante se comunica mediante un chat con otro estudiante con quien ha
+establecido una conexión.}
+{Debe existir una conexión entre ambos estudiantes.}
+{
+1. El estudiante consulta sus conexiones. \newline
+2. Selecciona una conexión. \newline
+3. Accede al espacio de conversación. \newline
+4. Escribe un mensaje. \newline
+5. Envía el mensaje. \newline
+6. Puede recibir y consultar respuestas de la otra persona.
+}
+{
+1. El estudiante puede consultar conversaciones anteriores. \newline
+2. Puede abandonar la conversación y regresar posteriormente. \newline
+3. Puede continuar la conversación en diferentes momentos.
+}
+{
+1. La conexión deja de estar disponible. \newline
+2. Uno de los usuarios bloquea al otro. \newline
+3. El mensaje no puede enviarse temporalmente.
+}
+
+% ---------- CU-C06 ----------
+
+\CasoUso
+{Proteger la interacción}
+{CU-C06}
+{Estudiante}
+{El estudiante controla sus interacciones con otros usuarios mediante las opciones
+de bloqueo y reporte disponibles en la aplicación.}
+{El estudiante debe haber accedido a la aplicación y debe poder identificar al
+usuario con quien desea controlar la interacción.}
+{
+1. El estudiante accede al perfil o conversación de otro usuario. \newline
+2. Selecciona la opción correspondiente para bloquear o reportar. \newline
+3. Si realiza un reporte, indica el motivo. \newline
+4. Confirma la acción. \newline
+5. El sistema aplica la acción correspondiente.
+}
+{
+1. El estudiante puede bloquear a un usuario sin realizar un reporte. \newline
+2. Puede realizar un reporte y posteriormente bloquear al usuario. \newline
+3. Puede cancelar la acción antes de confirmarla.
+}
+{
+1. El usuario seleccionado deja de estar disponible. \newline
+2. El reporte no contiene la información requerida. \newline
+3. La acción no puede completarse temporalmente.
+}
+
+% ---------- CU-C07 ----------
+
+\CasoUso
+{Gestionar el acceso a la aplicación}
+{CU-C07}
+{Estudiante}
+{El estudiante administra su acceso a la aplicación mediante la creación, ingreso
+y gestión de su cuenta.}
+{El estudiante debe pertenecer a la comunidad universitaria para utilizar la
+aplicación.}
+{
+1. El estudiante selecciona la opción para registrarse. \newline
+2. Proporciona la información requerida. \newline
+3. Crea su cuenta. \newline
+4. Puede iniciar sesión posteriormente. \newline
+5. Puede utilizar la aplicación mientras su cuenta se encuentre activa.
+}
+{
+1. El estudiante puede cerrar sesión y volver a acceder posteriormente. \newline
+2. Puede modificar información relacionada con su cuenta. \newline
+3. Puede solicitar la eliminación de su cuenta.
+}
+{
+1. La información proporcionada durante el registro no es válida. \newline
+2. La cuenta ya existe. \newline
+3. El acceso no puede realizarse con la información proporcionada.
+}
+
+\newpage
+
+% =========================================================
+% PARTE II. DIAGRAMAS DE SECUENCIA Y DE COMUNICACIÓN
+% =========================================================
+
+\part{Diagramas de Secuencia y de Comunicación}
+
+% ---------------------------------------------------------
+% 10. INTRODUCCIÓN A LOS DIAGRAMAS
+% ---------------------------------------------------------
+
+\section{Introducción a los Diagramas de Interacción}
+
+Esta parte del documento presenta los diagramas de secuencia y de comunicación de
+la aplicación \textit{Tinder UD}, elaborados a partir de los casos de uso
+CU-C01 a CU-C07 descritos en la Parte I.
+
+Cada caso de uso cuenta con dos diagramas que representan la misma interacción
+desde perspectivas distintas: el diagrama de secuencia destaca el orden temporal
+de los mensajes, mientras que el diagrama de comunicación destaca la
+organización de los objetos que participan y los mensajes que intercambian.
+
+Los diagramas se construyeron con un enfoque de análisis, usando los tres tipos
+de objeto habituales: interfaz (\textit{boundary}), controlador
+(\textit{control}) y entidad de almacenamiento (base de datos).
+
+% ---------------------------------------------------------
+% 11. PARTICIPANTES Y NOTACIÓN
+% ---------------------------------------------------------
+
+\section{Participantes y Notación}
+
+\subsection{Participantes}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{|l|l|X|}
+\hline
+\rowcolor{gray!25}
+\textbf{Participante} & \textbf{Tipo} & \textbf{Responsabilidad} \\
+\hline
+Estudiante & Actor & Persona que interactúa con la aplicación para alcanzar los objetivos descritos en los casos de uso. \\
+\hline
+Interfaz (UI) & \textit{Boundary} & Recibe las acciones del estudiante y le presenta la información y los resultados. \\
+\hline
+Controlador & \textit{Control} & Coordina la lógica de cada caso de uso, valida la información y decide el flujo según las condiciones. \\
+\hline
+Base de Datos & \textit{Database} & Almacena y consulta perfiles, intereses, conexiones, mensajes, bloqueos, reportes y cuentas. \\
+\hline
+\end{tabularx}
+\end{center}
+
+\subsection{Notación utilizada}
+
+\begin{itemize}
+    \item \textbf{Numeración:} los mensajes de los diagramas de secuencia se
+    numeran de forma consecutiva según su orden de aparición; en los diagramas
+    de comunicación se usa numeración jerárquica (1, 2, 2.1, 2.2, \dots) para
+    indicar los mensajes anidados.
+    \item \textbf{\texttt{alt}:} alternativas excluyentes, correspondientes a los
+    escenarios alternativo y excepcional de cada caso de uso.
+    \item \textbf{\texttt{opt}:} comportamiento opcional.
+    \item \textbf{\texttt{loop}:} comportamiento repetitivo, por ejemplo mientras
+    el estudiante continúa explorando o conversando.
+    \item \textbf{\texttt{par}:} flujos que ocurren de forma concurrente.
+    \item \textbf{Condiciones entre corchetes:} en los diagramas de comunicación,
+    el texto entre \texttt{[ ]} indica la condición bajo la cual se envía el
+    mensaje; el asterisco (\texttt{*}) indica iteración.
+\end{itemize}
+
+\newpage
+
+% ---------------------------------------------------------
+% 12. DIAGRAMAS DE SECUENCIA
+% ---------------------------------------------------------
+
+\section{Diagramas de Secuencia}
+
+A continuación se presenta el diagrama de secuencia de cada caso de uso.
+
+% ---------- CU-C01 ----------
+\subsection{CU-C01 -- Facilitar la conexión entre estudiantes}
+
+\Ficha{CU-C01}{Facilitar la conexión entre estudiantes}
+{Estudiante, Interfaz (UI), Controlador, Base de Datos.}
+{Principal: el estudiante consulta perfiles, expresa interés y, si hay interés mutuo, se establece la conexión. Alternativo: continúa explorando o modifica sus preferencias. Excepcional: no existen perfiles que coincidan con sus preferencias.}
+{\texttt{loop}, \texttt{alt} anidados.}
+
+\Diagrama{figuras/secuencia/CU-C01_secuencia.png}{fig:sec_c01}{Diagrama de secuencia de CU-C01: Facilitar la conexión entre estudiantes}
+
+% ---------- CU-C02 ----------
+\subsection{CU-C02 -- Presentarse ante otros estudiantes}
+
+\Ficha{CU-C02}{Presentarse ante otros estudiantes}
+{Estudiante, Interfaz (UI), Controlador, Base de Datos.}
+{Principal: el estudiante consulta su perfil, actualiza fotografías, biografía, etiquetas, facultad y sede, y guarda la información. Excepcional: información incompleta o no válida.}
+{\texttt{alt}.}
+
+\Diagrama{figuras/secuencia/CU-C02_secuencia.png}{fig:sec_c02}{Diagrama de secuencia de CU-C02: Presentarse ante otros estudiantes}
+
+% ---------- CU-C03 ----------
+\subsection{CU-C03 -- Encontrar personas afines}
+
+\Ficha{CU-C03}{Encontrar personas afines}
+{Estudiante, Interfaz (UI), Controlador, Base de Datos, Perfiles (multiobjeto).}
+{Principal: el estudiante explora perfiles y aplica criterios de intereses, facultad o sede. Alternativo: explora sin filtros específicos. Excepcional: no hay perfiles que cumplan los criterios.}
+{\texttt{loop}, \texttt{alt} anidados, multiobjeto.}
+
+\Diagrama{figuras/secuencia/CU-C03_secuencia.png}{fig:sec_c03}{Diagrama de secuencia de CU-C03: Encontrar personas afines}
+
+% ---------- CU-C04 ----------
+\subsection{CU-C04 -- Establecer una conexión}
+
+\Ficha{CU-C04}{Establecer una conexión}
+{Estudiante A, Estudiante B, Interfaz (UI), Controlador, Base de Datos.}
+{Principal: ambos estudiantes expresan interés, se identifica el interés mutuo y se establece la conexión y el chat. Alternativo: no hay interés mutuo y el estudiante continúa explorando. Excepcional: el perfil deja de estar disponible.}
+{\texttt{alt} anidados, \texttt{par} y nota sobre condición de carrera.}
+
+\Diagrama{figuras/secuencia/CU-C04_secuencia.png}{fig:sec_c04}{Diagrama de secuencia de CU-C04: Establecer una conexión}
+
+% ---------- CU-C05 ----------
+\subsection{CU-C05 -- Comunicarse con una conexión}
+
+\Ficha{CU-C05}{Comunicarse con una conexión}
+{Estudiante, Conexión (otro estudiante), Interfaz (UI), Controlador, Base de Datos.}
+{Principal: el estudiante selecciona una conexión, accede a la conversación y envía y recibe mensajes. Alternativo: consulta conversaciones anteriores. Excepcional: conexión no disponible, usuario bloqueado o mensaje que no puede enviarse.}
+{\texttt{alt}, \texttt{loop}, \texttt{par}.}
+
+\Diagrama{figuras/secuencia/CU-C05_secuencia.png}{fig:sec_c05}{Diagrama de secuencia de CU-C05: Comunicarse con una conexión}
+
+% ---------- CU-C06 ----------
+\subsection{CU-C06 -- Proteger la interacción}
+
+\Ficha{CU-C06}{Proteger la interacción}
+{Estudiante, Interfaz (UI), Controlador, Base de Datos.}
+{Principal: el estudiante bloquea o reporta a otro usuario y confirma la acción. Alternativo: bloquea sin reportar, reporta y luego bloquea, o cancela antes de confirmar. Excepcional: usuario no disponible o reporte sin la información requerida.}
+{\texttt{alt} anidados, \texttt{opt}.}
+
+\Diagrama{figuras/secuencia/CU-C06_secuencia.png}{fig:sec_c06}{Diagrama de secuencia de CU-C06: Proteger la interacción}
+
+% ---------- CU-C07 ----------
+\subsection{CU-C07 -- Gestionar el acceso a la aplicación}
+
+\Ficha{CU-C07}{Gestionar el acceso a la aplicación}
+{Estudiante, Interfaz (UI), Controlador, Base de Datos.}
+{Principal: el estudiante se registra, inicia sesión y utiliza la aplicación. Alternativo: cierra sesión, modifica su cuenta o solicita eliminarla. Excepcional: datos no válidos, cuenta ya existente o acceso no permitido.}
+{\texttt{alt} anidados, \texttt{opt}.}
+
+\Diagrama{figuras/secuencia/CU-C07_secuencia.png}{fig:sec_c07}{Diagrama de secuencia de CU-C07: Gestionar el acceso a la aplicación}
+
+\newpage
+
+% ---------------------------------------------------------
+% 13. DIAGRAMAS DE COMUNICACIÓN
+% ---------------------------------------------------------
+
+\section{Diagramas de Comunicación}
+
+A continuación se presenta el diagrama de comunicación de cada caso de uso. Los
+mensajes conservan los mismos nombres que en los diagramas de secuencia, pero se
+numeran jerárquicamente y se acompañan de las condiciones en las que se envían.
+
+% ---------- CU-C01 ----------
+\subsection{CU-C01 -- Facilitar la conexión entre estudiantes}
+
+\Diagrama{figuras/comunicacion/CU-C01_comunicacion.png}{fig:com_c01}{Diagrama de comunicación de CU-C01: Facilitar la conexión entre estudiantes}
+
+% ---------- CU-C02 ----------
+\subsection{CU-C02 -- Presentarse ante otros estudiantes}
+
+\Diagrama{figuras/comunicacion/CU-C02_comunicacion.png}{fig:com_c02}{Diagrama de comunicación de CU-C02: Presentarse ante otros estudiantes}
+
+% ---------- CU-C03 ----------
+\subsection{CU-C03 -- Encontrar personas afines}
+
+\Diagrama{figuras/comunicacion/CU-C03_comunicacion.png}{fig:com_c03}{Diagrama de comunicación de CU-C03: Encontrar personas afines}
+
+% ---------- CU-C04 ----------
+\subsection{CU-C04 -- Establecer una conexión}
+
+\Diagrama{figuras/comunicacion/CU-C04_comunicacion.png}{fig:com_c04}{Diagrama de comunicación de CU-C04: Establecer una conexión}
+
+% ---------- CU-C05 ----------
+\subsection{CU-C05 -- Comunicarse con una conexión}
+
+\Diagrama{figuras/comunicacion/CU-C05_comunicacion.png}{fig:com_c05}{Diagrama de comunicación de CU-C05: Comunicarse con una conexión}
+
+% ---------- CU-C06 ----------
+\subsection{CU-C06 -- Proteger la interacción}
+
+\Diagrama{figuras/comunicacion/CU-C06_comunicacion.png}{fig:com_c06}{Diagrama de comunicación de CU-C06: Proteger la interacción}
+
+% ---------- CU-C07 ----------
+\subsection{CU-C07 -- Gestionar el acceso a la aplicación}
+
+\Diagrama{figuras/comunicacion/CU-C07_comunicacion.png}{fig:com_c07}{Diagrama de comunicación de CU-C07: Gestionar el acceso a la aplicación}
+
+\newpage
+% ---------------------------------------------------------
+% 14. DIAGRAMAS DE CLASES
+% ---------------------------------------------------------
+
+\section{Diagrama de Clases}
+
+El diagrama de clases presenta la estructura estática del sistema \textit{Tinder UD}:
+las clases que representan los conceptos del dominio, sus atributos, sus operaciones
+principales y las relaciones entre ellas. Se elaboró a partir de los casos de uso
+CU-C01 a CU-C07 y es coherente con los diagramas de secuencia y de comunicación
+presentados anteriormente.
+
+Las clases se organizan en cinco grupos. \textbf{Usuarios:} la clase abstracta
+\texttt{Usuario} agrupa los datos de acceso comunes y de ella heredan
+\texttt{Estudiante}, actor principal del sistema, y \texttt{Administrador}, encargado
+de revisar los reportes. \textbf{Operaciones comunes:} la interfaz genérica
+\texttt{CRUD<T>} define las operaciones básicas de creación, lectura, actualización y
+eliminación (\texttt{crear}, \texttt{leer}, \texttt{actualizar} y \texttt{eliminar}).
+Está separada de las clases concretas para que cualquier entidad que requiera estas
+operaciones pueda implementarla sin duplicar código. Actualmente la implementan
+\texttt{Perfil} y \texttt{Foto}, y \texttt{Estudiante} depende de ella para gestionar
+estos elementos. \textbf{Perfil:} \texttt{Perfil}, \texttt{Foto}, \texttt{Interes} y
+\texttt{FiltroBusqueda} permiten que el estudiante se presente y encuentre personas
+afines. \textbf{Interacción:} \texttt{Reaccion}, \texttt{Conexion} y \texttt{Mensaje}
+modelan el interés entre estudiantes, la conexión que surge del interés mutuo y el
+chat habilitado entre ellos. \textbf{Seguridad:} \texttt{Reporte} y \texttt{Bloqueo}
+permiten controlar las interacciones no deseadas.
+\Diagrama{figuras/clases/diagrama_clases.png}{fig:clases}{Diagrama de clases de Tinder UD}
+
+\newpage
+
+% ---------------------------------------------------------
+% DIAGRAMAS DE ESTADOS
+% ---------------------------------------------------------
+
+\section{Diagramas de Estados}
+
+Los diagramas de estados permiten representar los diferentes estados por los que
+puede pasar un elemento del sistema y las condiciones que provocan las
+transiciones entre ellos. Para la aplicación \textit{Tinder UD}, se elaboraron
+dos diagramas de estados considerados importantes para su funcionamiento: el
+estado de la cuenta del estudiante y el estado de los reportes realizados sobre
+otros usuarios.
+
+\subsection{Estado de la Cuenta}
+
+El diagrama de estados de la cuenta representa las condiciones en las que puede
+encontrarse la cuenta de un estudiante durante su uso de la aplicación. Se
+definieron cuatro estados: activa, inactiva, suspendida y eliminada.
+
+Una cuenta se encuentra activa cuando el estudiante puede acceder y utilizar las
+funcionalidades de la aplicación. Si transcurren tres días sin actividad, la
+cuenta pasa al estado inactivo. El estudiante puede volver a activarla iniciando
+sesión correctamente. Por otra parte, un administrador puede suspender una
+cuenta activa o inactiva y, posteriormente, reactivarla si lo considera
+pertinente. Finalmente, una cuenta activa puede ser eliminada por solicitud del
+estudiante, mientras que una cuenta suspendida puede ser eliminada por un
+administrador. La eliminación corresponde al estado final de la cuenta.
+
+\Diagrama{figuras/estados/EstadoCuenta.png}{fig:estado-cuenta}{Diagrama de estados de la cuenta del estudiante}
+
+\subsection{Estado del Reporte}
+
+El diagrama de estados del reporte representa el proceso que sigue un reporte
+realizado por un estudiante sobre otro usuario. Este proceso contempla la
+revisión del reporte, la validación de su motivo y la resolución correspondiente.
+
+Cuando se realiza un reporte, este pasa inicialmente por una etapa de revisión
+y posteriormente al estado pendiente. A continuación, se valida el motivo
+indicado. Si el reporte carece de justificación o no presenta un motivo válido,
+se descarta. En caso contrario, se identifica el motivo del reporte, que puede
+corresponder a acoso, spam, perfil falso, contenido inapropiado u otro motivo.
+Después de evaluar la situación, el reporte se marca como resuelto, finalizando
+su proceso.
+
+\Diagrama{figuras/estados/EstadoReporte.png}{fig:estado-reporte}{Diagrama de estados del reporte de un usuario}
+
+
+\newpage
+
+\newpage
+% ---------------------------------------------------------
+% DIAGRAMA DE ACTIVIDADES CON PARTICIONES
+% ---------------------------------------------------------
+
+\section{Diagrama de Actividades con Particiones}
+
+El diagrama de actividades representa el flujo de trabajo de una actividad
+principal del sistema \textit{Tinder UD}. Se eligió la \textbf{denuncia de un
+usuario}, porque es el proceso en el que intervienen más actores y que
+complementa el caso de uso CU-C06 (\textit{Proteger la interacción}) y el
+diagrama de estados del reporte.
+
+Las particiones (carriles) indican quién realiza cada actividad:
+\textbf{Denunciante}, \textbf{Administrador} y \textbf{Denunciado}.
+
+\Ficha{AD-01}{Denuncia de un usuario}
+{Denunciante, Administrador y Denunciado.}
+{El denunciante realiza una denuncia y el administrador la recibe y valida. Si la denuncia es válida, se bloquea la cuenta denunciada; si no lo es, se penaliza al denunciante durante 3 días. En ambos casos el administrador notifica al denunciante. El denunciado recibe una notificación y, según la decisión, el proceso termina o su cuenta se bloquea.}
+{Nodo inicial, nodos de actividad, particiones, nodos de decisión, flujos de control y nodos finales.}
+
+\subsection{Descripción del flujo}
+
+\begin{enumerate}
+    \item El \textbf{denunciante} realiza una denuncia contra otro usuario.
+    \item El \textbf{administrador} recibe la denuncia y la valida.
+    \item Si la validación es afirmativa (\textit{Sí}), el administrador bloquea
+    la cuenta denunciada.
+    \item Si la validación es negativa (\textit{No}), el administrador penaliza
+    durante 3 días al denunciante.
+    \item En ambos casos, el administrador notifica el resultado y el
+    denunciante recibe la notificación de la denuncia, con lo que finaliza su
+    flujo.
+    \item El \textbf{denunciado} recibe una notificación. Si la condición
+    evaluada es afirmativa (\textit{Sí}), el flujo termina; si es negativa
+    (\textit{No}), su cuenta se bloquea.
+\end{enumerate}
+
+\Diagrama{figuras/actividades/diagrama_actividades.png}{fig:actividades}{Diagrama de actividades con particiones: denuncia de un usuario}
+
+\newpage
+% ---------------------------------------------------------
+% DIAGRAMA DE SISTEMAS
+% ---------------------------------------------------------
+
+\section{Diagrama de Sistemas}
+
+El diagrama de sistemas presenta la organización general de \textit{Tinder UD} en
+paquetes. Muestra el sistema completo dividido en capas y la dependencia entre
+ellas, e incluye el valor de inestabilidad (\textit{I}) de cada paquete, donde
+$I = 0$ indica un paquete totalmente estable y $I = 1$ uno totalmente inestable.
+
+El sistema se organiza en cuatro niveles:
+
+\begin{itemize}
+    \item \textbf{Presentación} (\texttt{UI}, $I=1.00$): contiene la interfaz con
+    la que interactúa el estudiante. Depende de los controladores y nadie
+    depende de ella.
+    \item \textbf{Controladores} ($I=0.83$): coordinan la lógica de cada caso de
+    uso y dependen de los paquetes del dominio y de la persistencia.
+    \item \textbf{Dominio} ($I=0.00$): agrupa los conceptos del negocio en cinco
+    paquetes: \textit{Usuarios} ($I=0.33$), \textit{Perfil} ($I=0.25$),
+    \textit{Interacción} ($I=0.33$), \textit{Seguridad} ($I=0.33$) y
+    \textit{Común} ($I=0.00$), que contiene la interfaz genérica
+    \texttt{CRUD<T>}.
+    \item \textbf{Persistencia} (\texttt{Base de Datos}, $I=0.80$): almacena la
+    información del dominio.
+\end{itemize}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{|l|X|c|}
+\hline
+\rowcolor{gray!25}
+\textbf{Paquete} & \textbf{Contenido} & \textbf{Inestabilidad (I)} \\
+\hline
+Presentación & UI & 1.00 \\
+\hline
+Controladores & Controladores & 0.83 \\
+\hline
+Usuarios & Usuario, Estudiante, Administrador & 0.33 \\
+\hline
+Perfil & Perfil, Foto, Interés, FiltroBúsqueda & 0.25 \\
+\hline
+Interacción & Reacción, Conexión, Mensaje & 0.33 \\
+\hline
+Seguridad & Administrar, Reporte, Bloqueo & 0.33 \\
+\hline
+Común & CRUD<T> & 0.00 \\
+\hline
+Persistencia & Base de Datos & 0.80 \\
+\hline
+\end{tabularx}
+\end{center}
+
+\Diagrama{figuras/sistemas/diagrama_sistemas.png}{fig:sistemas}{Diagrama de sistemas (paquetes) de Tinder UD}
+
+\newpage
+% ---------------------------------------------------------
+% DIAGRAMA DE COMPONENTES
+% ---------------------------------------------------------
+
+\section{Diagrama de Componentes}
+
+El diagrama de componentes presenta la estructura física del sistema completo en
+cuatro capas y muestra qué componente soporta cada caso de uso. Los componentes
+de interfaz se relacionan con los controladores mediante dependencias
+(\textit{use}), y los controladores acceden a los datos mediante repositorios
+conectados a la base de datos.
+
+\begin{itemize}
+    \item \textbf{Interfaz (\textit{Boundary}):} UI de Acceso a la Aplicación
+    (CU-C07), UI de Administración de Reportes, UI de Protección (CU-C06),
+    UI de Chat (CU-C05), UI de Conexiones (CU-C01 y CU-C04), UI de Perfil
+    (CU-C02) y UI de Exploración y Filtros (CU-C03).
+    \item \textbf{Control:} un controlador por cada interfaz: Acceso y Cuenta,
+    Administración, Protección, Chat, Conexiones, Perfil y Exploración.
+    \item \textbf{Servicios de apoyo:} Servicio de Validación de Comunidad
+    Universitaria, Servicio de Notificaciones y Servicio de Almacenamiento de
+    Fotos.
+    \item \textbf{Acceso a datos:} Repositorio de Cuentas, Repositorio de
+    Bloqueos y Reportes, Repositorio de Mensajes, Repositorio de Reacciones y
+    Conexiones, y Repositorio de Perfiles e Intereses.
+    \item \textbf{Base de Datos:} almacena cuentas, perfiles, fotos, intereses,
+    reacciones, conexiones, mensajes, bloqueos y reportes.
+\end{itemize}
+
+Los actores que interactúan con el sistema son el \textbf{Estudiante}, que usa
+la aplicación, y el \textbf{Administrador}, que revisa los reportes.
+
+\Diagrama{figuras/componentes/diagrama_componentes.png}{fig:componentes}{Diagrama de componentes de Tinder UD}
+
+\newpage
+% ---------------------------------------------------------
+% DIAGRAMA DE NODOS
+% ---------------------------------------------------------
+
+\section{Diagrama de Nodos}
+
+El diagrama de nodos (despliegue) representa la infraestructura física sobre la
+que funcionaría \textit{Tinder UD}: el hardware, el software que se ejecuta en
+cada nodo y las conexiones entre ellos.
+
+\begin{center}
+\begin{tabularx}{\textwidth}{|l|X|}
+\hline
+\rowcolor{gray!25}
+\textbf{Nodo} & \textbf{Descripción} \\
+\hline
+PC / Servidor principal & Equipo que aloja la aplicación. Contiene la interfaz web, el \textit{backend} (controladores, API y operaciones CRUD) y la base de datos PostgreSQL. \\
+\hline
+CPU & Procesador Intel Celeron G5905 de 10.ª generación, encargado del procesamiento. \\
+\hline
+Memoria RAM & 4 GB de memoria para el servidor. \\
+\hline
+Dispositivos de entrada y salida & Monitor (salida), ratón y teclado (entrada), y la interfaz de visualización y acciones. \\
+\hline
+Internet & Conexión de red del servidor hacia los usuarios. \\
+\hline
+Módem / Router & Dispositivo que conecta el servidor con Internet mediante red IP. \\
+\hline
+\end{tabularx}
+\end{center}
+
+Dentro del servidor, la interfaz web envía solicitudes al \textit{backend}, y
+este realiza consultas SQL a la base de datos PostgreSQL. El servidor se conecta
+a Internet a través del módem o router, lo que permite que los estudiantes
+accedan a la aplicación.
+
+\Diagrama{figuras/nodos/diagrama_nodos.png}{fig:nodos}{Diagrama de nodos de Tinder UD}
+% =========================================================
+% CONSIDERACIONES FINALES
+% =========================================================
+
+\section{Consideraciones}
+
+Los casos de uso identificados representan los objetivos principales del estudiante
+al utilizar la aplicación y no corresponden a decisiones específicas de
+implementación.
+
+Las funcionalidades como filtros, fotografías, etiquetas de intereses, ``like'',
+``dislike'', generación de \textit{match} y habilitación del chat se consideran
+comportamientos necesarios para alcanzar los objetivos descritos en los casos de
+uso.
+
+El caso de uso principal de la aplicación es \textit{Facilitar la conexión entre
+estudiantes}, mientras que los demás casos complementan este objetivo permitiendo
+que los estudiantes se presenten, encuentren personas afines, establezcan
+conexiones, se comuniquen y mantengan un entorno de interacción controlado.
+
+Los diagramas de secuencia y de comunicación describen las interacciones
+necesarias para cumplir los objetivos de cada caso de uso, sin definir decisiones
+de implementación como tecnologías, protocolos o estructura interna de la base de
+datos. En ambos tipos de diagrama se conserva la misma separación de
+responsabilidades entre interfaz, controlador y base de datos, y los escenarios
+principal, alternativo y excepcional de cada caso de uso quedan representados
+mediante fragmentos combinados o mensajes condicionados.
+
+Los diagramas de estados permiten representar los cambios que pueden
+experimentar dos elementos importantes de la aplicación \textit{Tinder UD}: las
+cuentas de los estudiantes y los reportes realizados sobre otros usuarios. Estos
+diagramas complementan los casos de uso y los diagramas de interacción, al
+mostrar cómo evoluciona cada elemento según los eventos y las condiciones
+definidas.
+
+\end{document}
