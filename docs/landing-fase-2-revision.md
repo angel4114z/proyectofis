@@ -3,7 +3,7 @@
 **Fecha:** 2026-11-10  
 **Evaluador:** Agente Antigravity (Revisión Visual Autorizada)  
 **Entorno evaluado:** Servidor local Next.js en producción (`http://localhost:3000`), navegadores Orca Browser y Microsoft Edge headless.  
-**Capturas generadas:** `docs/capturas/landing-fase-2/` (`1440-light.png`, `1440-dark.png`, `768-light.png`, `768-dark.png`, `320-light.png`, `320-dark.png` y capturas de sesión `landing-*`).
+**Capturas generadas:** `docs/capturas/landing-fase-2/` (`1440-light.png`, `1440-dark.png`, `768-light.png`, `768-dark.png`, `320-light.png`, `320-dark.png`).
 
 ---
 
@@ -66,12 +66,12 @@ Se ejecutó la revisión visual y técnica completa de la landing pública de Ti
 ## Registro de Capturas
 
 Las capturas de página completa están preservadas en `docs/capturas/landing-fase-2/`:
-- `1440-light.png` / `landing-1440-light.png`: Vista completa de escritorio (1440 px) en esquema claro.
-- `1440-dark.png` / `landing-1440-dark.png`: Vista completa de escritorio (1440 px) en esquema oscuro.
-- `768-light.png` / `landing-768-light.png`: Vista completa de tableta (768 px) en esquema claro.
-- `768-dark.png` / `landing-768-dark.png`: Vista completa de tableta (768 px) en esquema oscuro.
-- `320-light.png` / `landing-320-light.png`: Vista completa de móvil (320 px) en esquema claro.
-- `320-dark.png` / `landing-320-dark.png`: Vista completa de móvil (320 px) en esquema oscuro.
+- `1440-light.png`: Vista completa de escritorio (1440 px) en esquema claro.
+- `1440-dark.png`: Vista completa de escritorio (1440 px) en esquema oscuro.
+- `768-light.png`: Vista completa de tableta (768 px) en esquema claro.
+- `768-dark.png`: Vista completa de tableta (768 px) en esquema oscuro.
+- `320-light.png`: Vista completa de móvil (320 px) en esquema claro.
+- `320-dark.png`: Vista completa de móvil (320 px) en esquema oscuro.
 - `browser-checks.json`: Registro automatizado de validaciones del navegador.
 
 ## Actualización del coordinador · validación final

@@ -6,7 +6,7 @@
 
 ## Resultado
 
-La landing pública y las pantallas informativas `/login` y `/register` están implementadas para revisión local. No se desplegó la aplicación ni se añadieron dependencias. El backend no se modificó. Los cambios funcionales de esta fase se limitaron a `frontend/`.
+La landing pública y las pantallas informativas `/login` y `/register` están implementadas para revisión local. No se desplegó la aplicación ni se añadieron dependencias. No se modificó código del backend. El placeholder vacío `backend/.env` dejó de rastrearse; su copia local de cero bytes permanece y `.gitignore` la excluye. Los cambios funcionales de esta fase se limitaron a `frontend/`.
 
 La landing se genera como contenido estático. El navbar y el selector de tema contienen las interacciones de cliente; la composición del Hero es estática. Se conservaron `AppRouterCacheProvider` para `v16-appRouter`, `InitColorSchemeScript` y los temas claro, oscuro y automático con preferencia persistente.
 

@@ -56,6 +56,6 @@ Se corrigieron los hallazgos de revisión: el acordeón usa el `<h3>` que genera
 
 En el build final, `pnpm exec tsc --noEmit`, `pnpm exec eslint src` y `pnpm build` pasan. Edge 157 reporta consola limpia, FAQ con seis regiones ARIA enlazadas, foco de teclado visible, menú móvil que devuelve el foco al abrir/cerrar con Escape, preferencia de tema persistente y modo automático, movimiento reducido, destinos existentes y sin overflow a 320/768/1440 px. Contraste del borde oscuro: 3.46:1 sobre superficie y 4.07:1 sobre fondo. Las seis capturas finales y el registro automatizado están en `docs/capturas/landing-fase-2/`.
 
-No se modificaron backend, dependencias ni configuraciones globales. Las rutas de acceso/registro siguen siendo informativas y no capturan credenciales. Pendientes de auditoría complementaria: lector de pantalla y zoom al 200 %; textos legales definitivos siguen pendientes de aprobación.
+No se modificó código del backend, dependencias ni configuraciones globales. El placeholder vacío `backend/.env` dejó de rastrearse, conservando su copia local. Las rutas de acceso/registro siguen siendo informativas y no capturan credenciales. Pendientes de auditoría complementaria: lector de pantalla y zoom al 200 %; textos legales definitivos siguen pendientes de aprobación.
 Referencias: [propuesta](../../landing-fase-1.md), [tema](../../../frontend/src/theme/theme.ts),
 [providers](../../../frontend/src/providers/AppProviders.tsx), [page](../../../frontend/src/app/page.tsx).
