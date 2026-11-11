@@ -1,0 +1,14 @@
+{
+  "name": "tinderud",
+  "description": "Desarrollo de TinderUD con las skills compartidas del proyecto.",
+  "includeMcpJson": true,
+  "resources": [
+    "skill://.agents/skills/tinderud-context/SKILL.md",
+    "skill://.agents/skills/tinderud-design/SKILL.md",
+    "skill://.agents/skills/tinderud-architecture/SKILL.md",
+    "skill://.agents/skills/tinderud-memory/SKILL.md",
+    "skill://.agents/skills/vercel-react-best-practices/SKILL.md",
+    "skill://.agents/skills/material-ui-nextjs/SKILL.md",
+    "skill://.agents/skills/accessibility-audit/SKILL.md"
+  ]
+}

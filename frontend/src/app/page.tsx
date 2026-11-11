@@ -1,69 +1,32 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+import { Box } from "@mui/material";
 
-export default function Home() {
+import { SkipLink } from "@/features/landing/components/SkipLink";
+import { Navbar } from "@/features/landing/components/Navbar";
+import { Hero } from "@/features/landing/sections/Hero";
+import { Modes } from "@/features/landing/sections/Modes";
+import { HowItWorks } from "@/features/landing/sections/HowItWorks";
+import { Community } from "@/features/landing/sections/Community";
+import { Faq } from "@/features/landing/sections/Faq";
+import { CtaFinal } from "@/features/landing/sections/CtaFinal";
+import { Footer } from "@/features/landing/sections/Footer";
+
+// Página servidor: el contenido, anclas y metadatos viven en el HTML inicial.
+// Las únicas islas cliente son Navbar (menú y selector de tema) y las
+// microinteracciones del hero y la FAQ.
+export default function HomePage() {
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>
-            To get started, edit the{" "}
-            <code className={styles.code}>page.tsx</code> file.
-          </h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100dvh" }}>
+      <SkipLink />
+      <Navbar />
+      <Box component="main" id="contenido" sx={{ flex: 1 }}>
+        <Hero />
+        <Modes />
+        <HowItWorks />
+        <Community />
+        <Faq />
+        <CtaFinal />
+      </Box>
+      <Footer />
+    </Box>
   );
 }

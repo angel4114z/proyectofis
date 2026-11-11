@@ -1,3 +1,26 @@
+# Local secrets and environment configuration
+.env
+.env.*
+!.env.example
+
+# Python virtual environments and bytecode
 /backend/.venv/
+.venv/
+venv/
 __pycache__/
 *.py[cod]
+
+# JavaScript build and dependency output
+node_modules/
+.next/
+out/
+dist/
+build/
+coverage/
+
+# Local logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*

@@ -1,49 +1,26 @@
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/*
+ * Estilos globales estructurales.
+ * El color de fondo, el texto y color-scheme los gobierna MUI mediante
+ * CssBaseline, colorSchemes y variables CSS; no se duplican aquí para evitar
+ * conflictos de tema. No se fija overflow-x global: ocultaría fallos de
+ * reflow a 320 px. El reset de MUI retira el subrayado de los enlaces, por eso
+ * se restablece para enlaces dentro de texto con la clase utilitaria de abajo.
+ */
 
 html {
   height: 100%;
 }
 
-html,
-body {
-  max-width: 100vw;
-  overflow-x: hidden;
-}
-
 body {
   min-height: 100%;
-  display: flex;
-  flex-direction: column;
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
+/* Enlaces dentro de párrafos de contenido: subrayado legible. */
+.content-link {
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
-  }
+.content-link:hover {
+  text-decoration-thickness: 2px;
 }
