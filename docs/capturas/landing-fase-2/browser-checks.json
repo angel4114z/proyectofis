@@ -1,0 +1,287 @@
+{
+  "browser": "Edg/157.0.4341.42",
+  "checks": [
+    {
+      "name": "semantic-structure",
+      "pass": true,
+      "details": {
+        "h1": 1,
+        "ids": [],
+        "sections": 6,
+        "emptyLinks": 0,
+        "inputs": 0
+      }
+    },
+    {
+      "name": "faq-aria-links",
+      "pass": true,
+      "details": [
+        {
+          "id": "faq-correo-institucional-content",
+          "labelledby": "faq-correo-institucional-header",
+          "summary": true
+        },
+        {
+          "id": "faq-confirma-correo-content",
+          "labelledby": "faq-confirma-correo-header",
+          "summary": true
+        },
+        {
+          "id": "faq-quien-ve-perfil-content",
+          "labelledby": "faq-quien-ve-perfil-header",
+          "summary": true
+        },
+        {
+          "id": "faq-tres-modos-content",
+          "labelledby": "faq-tres-modos-header",
+          "summary": true
+        },
+        {
+          "id": "faq-cuando-conversar-content",
+          "labelledby": "faq-cuando-conversar-header",
+          "summary": true
+        },
+        {
+          "id": "faq-edad-content",
+          "labelledby": "faq-edad-header",
+          "summary": true
+        }
+      ]
+    },
+    {
+      "name": "keyboard-visible-focus",
+      "pass": true,
+      "details": {
+        "text": "Saltar al contenido",
+        "visible": true,
+        "outline": "2px",
+        "offset": "2px"
+      }
+    },
+    {
+      "name": "faq-key-interaction",
+      "pass": true,
+      "details": {
+        "expanded": "true",
+        "region": true,
+        "visible": "visible"
+      }
+    },
+    {
+      "name": "mobile-menu-opens",
+      "pass": true,
+      "details": {
+        "expanded": "true",
+        "labelled": true
+      }
+    },
+    {
+      "name": "mobile-menu-escape-focus-return",
+      "pass": true,
+      "details": {
+        "expanded": "false",
+        "focus": "Abrir menú"
+      }
+    },
+    {
+      "name": "faq-default-collapsed",
+      "pass": true
+    },
+    {
+      "name": "reflow-320-light",
+      "pass": true,
+      "details": {
+        "width": 320,
+        "scroll": 305
+      }
+    },
+    {
+      "name": "reflow-320-dark",
+      "pass": true,
+      "details": {
+        "width": 320,
+        "scroll": 305
+      }
+    },
+    {
+      "name": "reflow-768-light",
+      "pass": true,
+      "details": {
+        "width": 768,
+        "scroll": 753
+      }
+    },
+    {
+      "name": "reflow-768-dark",
+      "pass": true,
+      "details": {
+        "width": 768,
+        "scroll": 768
+      }
+    },
+    {
+      "name": "reflow-1440-light",
+      "pass": true,
+      "details": {
+        "width": 1440,
+        "scroll": 1425
+      }
+    },
+    {
+      "name": "reflow-1440-dark",
+      "pass": true,
+      "details": {
+        "width": 1440,
+        "scroll": 1440
+      }
+    },
+    {
+      "name": "dark-card-border-contrast",
+      "pass": true,
+      "details": {
+        "border": "rgba(247, 248, 252, 0.4)",
+        "surface": "rgb(34, 40, 64)",
+        "ratioSurface": 3.461845174317147,
+        "ratioPage": 4.069964985333816
+      }
+    },
+    {
+      "name": "dark-persists-after-reload",
+      "pass": true
+    },
+    {
+      "name": "light-persists-after-reload",
+      "pass": true
+    },
+    {
+      "name": "system-dark",
+      "pass": true
+    },
+    {
+      "name": "system-light",
+      "pass": true
+    },
+    {
+      "name": "reduced-motion",
+      "pass": true,
+      "details": {
+        "reduce": true,
+        "hiddenNodes": 0
+      }
+    },
+    {
+      "name": "links",
+      "pass": true,
+      "details": [
+        {
+          "href": "#contenido",
+          "ok": true
+        },
+        {
+          "href": "/",
+          "ok": true,
+          "status": 200
+        },
+        {
+          "href": "#modos",
+          "ok": true
+        },
+        {
+          "href": "#como-funciona",
+          "ok": true
+        },
+        {
+          "href": "#comunidad",
+          "ok": true
+        },
+        {
+          "href": "#preguntas",
+          "ok": true
+        },
+        {
+          "href": "/login",
+          "ok": true,
+          "status": 200
+        },
+        {
+          "href": "/register",
+          "ok": true,
+          "status": 200
+        }
+      ]
+    },
+    {
+      "name": "informational-/login",
+      "pass": true,
+      "details": {
+        "h1": 1,
+        "inputs": 0,
+        "text": true
+      }
+    },
+    {
+      "name": "informational-/register",
+      "pass": true,
+      "details": {
+        "h1": 1,
+        "inputs": 0,
+        "text": true
+      }
+    },
+    {
+      "name": "browser-console",
+      "pass": true,
+      "details": []
+    }
+  ],
+  "captures": [
+    {
+      "width": 320,
+      "theme": "light",
+      "path": "docs\\capturas\\landing-fase-2\\320-light.png",
+      "height": 5428
+    },
+    {
+      "width": 320,
+      "theme": "dark",
+      "path": "docs\\capturas\\landing-fase-2\\320-dark.png",
+      "height": 5428
+    },
+    {
+      "width": 768,
+      "theme": "light",
+      "path": "docs\\capturas\\landing-fase-2\\768-light.png",
+      "height": 4410
+    },
+    {
+      "width": 768,
+      "theme": "dark",
+      "path": "docs\\capturas\\landing-fase-2\\768-dark.png",
+      "height": 4410
+    },
+    {
+      "width": 1440,
+      "theme": "light",
+      "path": "docs\\capturas\\landing-fase-2\\1440-light.png",
+      "height": 3334
+    },
+    {
+      "width": 1440,
+      "theme": "dark",
+      "path": "docs\\capturas\\landing-fase-2\\1440-dark.png",
+      "height": 3334
+    }
+  ],
+  "firstPaint": [
+    {
+      "name": "first-paint",
+      "scheme": "dark",
+      "background": "rgb(23, 27, 44)"
+    },
+    {
+      "name": "first-contentful-paint",
+      "scheme": "dark",
+      "background": "rgb(23, 27, 44)"
+    }
+  ]
+}

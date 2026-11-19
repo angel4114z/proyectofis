@@ -1,0 +1,26 @@
+/*
+ * Estilos globales estructurales.
+ * El color de fondo, el texto y color-scheme los gobierna MUI mediante
+ * CssBaseline, colorSchemes y variables CSS; no se duplican aquí para evitar
+ * conflictos de tema. No se fija overflow-x global: ocultaría fallos de
+ * reflow a 320 px. El reset de MUI retira el subrayado de los enlaces, por eso
+ * se restablece para enlaces dentro de texto con la clase utilitaria de abajo.
+ */
+
+html {
+  height: 100%;
+}
+
+body {
+  min-height: 100%;
+}
+
+/* Enlaces dentro de párrafos de contenido: subrayado legible. */
+.content-link {
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.content-link:hover {
+  text-decoration-thickness: 2px;
+}
