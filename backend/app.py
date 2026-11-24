@@ -71,6 +71,7 @@ upload_directory.mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=upload_directory), name="uploads")
 
 MAX_PHOTO_SIZE = 5 * 1024 * 1024
+MAX_CHAT_PHOTO_SIZE = 10 * 1024 * 1024
 ALLOWED_PHOTO_TYPES = {
     "image/jpeg": ".jpg",
     "image/png": ".png",
@@ -148,8 +149,13 @@ class PhotoResponse(BaseModel):
     photo_urls: list[str]
 
 
+class ChatPhotoResponse(BaseModel):
+    photo_url: str
+
+
 class MessageRequest(BaseModel):
-    text: str = Field(min_length=1)
+    text: str = ""
+    photo_url: str | None = None
 
 
 class MessageResponse(BaseModel):
@@ -157,6 +163,7 @@ class MessageResponse(BaseModel):
     connection_id: str
     sender_student_id: str
     text: str
+    photo_url: str | None = None
     created_at: str
 
 
@@ -458,6 +465,66 @@ def delete_profile_photo(student_id: CurrentStudent) -> None:
     profile_service.update_photo(student_id, None)
 
 
+@app.post(
+    "/matches/{connection_id}/photo",
+    response_model=ChatPhotoResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_chat_photo(
+    connection_id: str,
+    photo: Annotated[UploadFile, File()],
+    student_id: CurrentStudent,
+) -> ChatPhotoResponse:
+    try:
+        chat_service.list_messages(connection_id, student_id)
+    except MatchNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The connection was not found.",
+        ) from None
+    except StudentOutsideMatchError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="The authenticated student is not part of this connection.",
+        ) from None
+
+    if photo.content_type not in ALLOWED_PHOTO_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Only JPEG, PNG, and WebP images are allowed.",
+        )
+
+    content = await photo.read(MAX_CHAT_PHOTO_SIZE + 1)
+    if len(content) > MAX_CHAT_PHOTO_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail="The chat photo must not exceed 10 MB.",
+        )
+    if not content:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The selected photo is empty.",
+        )
+    if not _is_allowed_photo_signature(photo.content_type, content):
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="The file contents do not match an allowed image format.",
+        )
+
+    extension = ALLOWED_PHOTO_TYPES[photo.content_type]
+    chat_directory = upload_directory / "chat" / connection_id
+    chat_directory.mkdir(parents=True, exist_ok=True)
+    destination = chat_directory / f"msg-{student_id}-{uuid4().hex}{extension}"
+    temporary_destination = chat_directory / f".{uuid4().hex}.tmp"
+    try:
+        temporary_destination.write_bytes(content)
+        temporary_destination.replace(destination)
+    finally:
+        temporary_destination.unlink(missing_ok=True)
+
+    return ChatPhotoResponse(photo_url=_photo_url_for_path(destination))
+
+
 @app.get(
     "/matches/{connection_id}/messages",
     response_model=list[MessageResponse],
@@ -492,7 +559,10 @@ def send_match_message(
 ) -> MessageResponse:
     try:
         message = chat_service.send_message(
-            connection_id, student_id, request.text
+            connection_id,
+            student_id,
+            request.text,
+            photo_url=request.photo_url,
         )
     except MatchNotFoundError:
         raise HTTPException(
@@ -543,6 +613,7 @@ def _message_response(message) -> MessageResponse:
         connection_id=message.connection_id,
         sender_student_id=message.sender_student_id,
         text=message.text,
+        photo_url=message.photo_url,
         created_at=message.created_at.isoformat(),
     )
 

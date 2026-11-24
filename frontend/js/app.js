@@ -1,6 +1,10 @@
 const API_BASE_URL = "http://127.0.0.1:8000";
 const TOKEN_KEY = "tinder-ud-access-token";
 
+// Límite de 10 MB y formatos permitidos para fotos en el chat
+const MAX_CHAT_PHOTO_SIZE = 10 * 1024 * 1024;
+const ALLOWED_CHAT_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
 const state = {
   token: localStorage.getItem(TOKEN_KEY),
   studentId: null,
@@ -79,7 +83,6 @@ function profilePhotos(profile) {
   }
   return profile.photo_url ? [profile.photo_url] : [];
 }
-
 
 function showProfileDetail(profile) {
   const searchForm = document.getElementById("search-form");
@@ -559,6 +562,7 @@ async function loadChatConversations(connectionToSelect) {
   }
 }
 
+// Renderiza message.photo_url y message.text dentro de cada burbuja del chat
 async function loadChatMessages(connectionId) {
   const messagesElement = document.getElementById("chat-messages");
   if (!connectionId) {
@@ -576,11 +580,22 @@ async function loadChatMessages(connectionId) {
     } else {
       messages.forEach((message) => {
         const ownMessage = message.sender_student_id === state.studentId;
-        const bubble = createTextElement(
-          "div",
-          `chat-bubble${ownMessage ? " chat-bubble-own" : ""}`,
-          message.text,
-        );
+        const bubble = document.createElement("div");
+        bubble.className = `chat-bubble${ownMessage ? " chat-bubble-own" : ""}`;
+
+        if (message.photo_url) {
+          const photo = document.createElement("img");
+          photo.className = "chat-image";
+          photo.src = absolutePhotoUrl(message.photo_url);
+          photo.alt = "Fotografía enviada en el chat";
+          photo.loading = "lazy";
+          bubble.append(photo);
+        }
+
+        if (message.text) {
+          bubble.append(createTextElement("span", "", message.text));
+        }
+
         const time = createTextElement(
           "time",
           "chat-time",
@@ -748,28 +763,93 @@ function initializeIndexPage() {
   document
     .getElementById("profile-detail-back")
     .addEventListener("click", hideProfileDetail);
+
+  // Marca visualmente la selección de archivo y valida/sube la foto antes de enviar el mensaje
+  const chatPhotoInput = document.getElementById("chat-photo");
+  const chatPhotoButton = document.querySelector(".chat-photo-button");
+
+  chatPhotoInput?.addEventListener("change", () => {
+    const file = chatPhotoInput.files?.[0];
+    chatPhotoButton?.classList.toggle("is-selected", Boolean(file));
+    if (file) {
+      document.getElementById("chat-text").placeholder = `Foto: ${file.name}`;
+    } else {
+      document.getElementById("chat-text").placeholder = "";
+    }
+  });
+
   document.getElementById("chat-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const connectionId = state.activeConnectionId;
     const textInput = document.getElementById("chat-text");
     const text = textInput.value.trim();
-    if (!connectionId || !text) {
+    const photoFile = chatPhotoInput?.files?.[0];
+
+    if (!connectionId || (!text && !photoFile)) {
       return;
     }
+
+    if (photoFile) {
+      if (!ALLOWED_CHAT_PHOTO_TYPES.includes(photoFile.type)) {
+        showMessage(
+          appMessage,
+          "Solo se permiten imágenes JPEG, PNG o WebP.",
+          "error",
+        );
+        return;
+      }
+      if (photoFile.size > MAX_CHAT_PHOTO_SIZE) {
+        showMessage(
+          appMessage,
+          "La fotografía del chat no puede superar los 10 MB.",
+          "error",
+        );
+        return;
+      }
+    }
+
+    const submitButton = event.currentTarget.querySelector('button[type="submit"]');
+    submitButton.disabled = true;
     try {
+      let photoUrl = null;
+      if (photoFile) {
+        const formData = new FormData();
+        formData.append("photo", photoFile);
+        const uploadResult = await apiRequest(
+          `/matches/${encodeURIComponent(connectionId)}/photo`,
+          {
+            method: "POST",
+            body: formData,
+          },
+        );
+        photoUrl = uploadResult.photo_url;
+      }
+
       await apiRequest(
         `/matches/${encodeURIComponent(connectionId)}/messages`,
         {
           method: "POST",
-          body: { text },
+          body: {
+            text,
+            photo_url: photoUrl,
+          },
         },
       );
+
       textInput.value = "";
+      textInput.placeholder = "";
+      if (chatPhotoInput) {
+        chatPhotoInput.value = "";
+      }
+      chatPhotoButton?.classList.remove("is-selected");
       await loadChatMessages(connectionId);
     } catch (error) {
       showMessage(appMessage, error.message, "error");
+    } finally {
+      submitButton.disabled = false;
     }
   });
+
   document.addEventListener("chat:open", (event) => {
     loadChatConversations(event.detail.connectionId);
   });

@@ -7,6 +7,7 @@ from uuid import uuid4
 from .contratos import InteractionRepository, MessageRepository
 
 
+# Se agrega photo_url opcional para admitir mensajes con imagen en el chat.
 @dataclass(frozen=True)
 class Message:
     id: str
@@ -14,6 +15,7 @@ class Message:
     sender_student_id: str
     text: str
     created_at: datetime
+    photo_url: str | None = None
 
 
 class MatchNotFoundError(Exception):
@@ -43,17 +45,24 @@ class ChatService:
         connection = self._require_participant(connection_id, student_id)
         return self._messages.list_messages(connection.id)
 
+    # Permite enviar texto, foto o ambos; solo rechaza si ambos vienen vacíos.
     def send_message(
-        self, connection_id: str, student_id: str, text: str
+        self,
+        connection_id: str,
+        student_id: str,
+        text: str,
+        photo_url: str | None = None,
     ) -> Message:
         connection = self._require_participant(connection_id, student_id)
         normalized_text = text.strip()
-        if not normalized_text:
+        normalized_photo = photo_url.strip() if photo_url else None
+        if not normalized_text and not normalized_photo:
             raise EmptyMessageError
         return self._messages.create_message(
             connection_id=connection.id,
             sender_student_id=student_id,
             text=normalized_text,
+            photo_url=normalized_photo,
         )
 
     def _require_participant(

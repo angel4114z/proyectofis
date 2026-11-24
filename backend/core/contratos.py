@@ -56,12 +56,16 @@ class InteractionRepository(Protocol):
     ) -> Connection | None: ...
 
 
+# Se actualiza create_message en el protocolo para recibir photo_url opcional.
 class MessageRepository(Protocol):
     def create_message(
         self,
         connection_id: str,
         sender_student_id: str,
         text: str,
+        photo_url: str | None = None,
     ) -> Message: ...
+
+    def list_messages(self, connection_id: str) -> list[Message]: ...
 
     def list_messages(self, connection_id: str) -> list[Message]: ...
