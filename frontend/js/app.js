@@ -68,13 +68,48 @@ function createPhotoPlaceholder(name) {
   );
 }
 
+function absolutePhotoUrl(photoUrl) {
+  return photoUrl ? new URL(photoUrl, API_BASE_URL).href : null;
+}
+
+function showStudentHeader(profile) {
+  const photo = document.getElementById("student-photo");
+  const placeholder = document.getElementById("student-photo-placeholder");
+  document.getElementById("student-name").textContent = profile.name;
+  photo.onload = null;
+  photo.onerror = null;
+
+  if (!profile.photo_url) {
+    photo.hidden = true;
+    photo.removeAttribute("src");
+    placeholder.textContent = profile.name
+      .split(/\s+/)
+      .map((part) => part[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase();
+    placeholder.hidden = false;
+    return;
+  }
+
+  photo.onload = () => {
+    photo.hidden = false;
+    placeholder.hidden = true;
+  };
+  photo.onerror = () => {
+    photo.hidden = true;
+    placeholder.hidden = false;
+  };
+  photo.src = absolutePhotoUrl(profile.photo_url);
+}
+
 function createProfileCard(profile, options = {}) {
   const card = document.createElement("article");
-  card.className = "profile-card";
+  card.className = `profile-card${options.showReactions ? " discovery-card" : ""}`;
   if (profile.photo_url) {
     const photo = document.createElement("img");
     photo.className = "profile-photo";
-    photo.src = `${API_BASE_URL}${profile.photo_url}`;
+    photo.src = absolutePhotoUrl(profile.photo_url);
     photo.alt = `Fotografía de ${profile.name}`;
     photo.loading = "lazy";
     photo.addEventListener(
@@ -180,9 +215,7 @@ async function loadDiscovery() {
       );
       return;
     }
-    profiles.forEach((profile) =>
-      results.append(createProfileCard(profile, { showReactions: true })),
-    );
+    results.append(createProfileCard(profiles[0], { showReactions: true }));
   } catch (error) {
     results.replaceChildren();
     showMessage(document.getElementById("app-message"), error.message, "error");
@@ -371,10 +404,10 @@ function initializeIndexPage() {
   const loginMessage = document.getElementById("login-message");
   const appMessage = document.getElementById("app-message");
 
-  function showApplication(name) {
+  function showApplication(profile) {
     loginPanel.hidden = true;
     application.hidden = false;
-    document.getElementById("student-name").textContent = name;
+    showStudentHeader(profile);
     showView("discover");
   }
 
@@ -397,9 +430,16 @@ function initializeIndexPage() {
       localStorage.setItem(TOKEN_KEY, state.token);
       loginForm.reset();
       showMessage(loginMessage, "");
-      showApplication(result.student.name);
+      showMessage(appMessage, "");
+      showApplication(result.student);
+      const profile = await apiRequest("/profiles/me");
+      showStudentHeader(profile);
     } catch (error) {
-      showMessage(loginMessage, error.message, "error");
+      if (state.token) {
+        showMessage(appMessage, error.message, "error");
+      } else {
+        showMessage(loginMessage, error.message, "error");
+      }
     } finally {
       submitButton.disabled = false;
     }
@@ -457,7 +497,7 @@ function initializeIndexPage() {
     apiRequest("/profiles/me")
       .then((profile) => {
         state.studentId = profile.student_id;
-        showApplication(profile.name);
+        showApplication(profile);
       })
       .catch((error) => {
         clearSession();
@@ -470,6 +510,7 @@ function initializeIndexPage() {
 
 function initializeProfilePage() {
   const form = document.getElementById("profile-form");
+  const photoForm = document.getElementById("photo-form");
   const message = document.getElementById("profile-message");
   const submitButton = form.querySelector('button[type="submit"]');
 
@@ -480,13 +521,18 @@ function initializeProfilePage() {
   }
 
   apiRequest("/profiles/me")
-    .then((profile) => {
+    .then(async (profile) => {
       document.getElementById("profile-name").textContent = profile.name;
       form.elements.biography.value = profile.biography;
       form.elements.faculty.value = profile.faculty;
       form.elements.campus.value = profile.campus;
       form.elements.interests.value = profile.interests.join(", ");
-      updateProfilePhotoPreview(profile.photo_url);
+      try {
+        await updateProfilePhotoPreview(profile.photo_url);
+      } catch (error) {
+        showMessage(message, error.message, "error");
+      }
+      document.getElementById("upload-photo-button").disabled = true;
     })
     .catch((error) => {
       clearSession();
@@ -520,57 +566,76 @@ function initializeProfilePage() {
     }
   });
 
-  document
-    .getElementById("profile-photo")
-    .addEventListener("change", (event) => {
-      const file = event.currentTarget.files[0];
-      if (!file) {
-        return;
-      }
-      const preview = document.getElementById("profile-photo-preview");
-      const placeholder = document.getElementById("profile-photo-placeholder");
-      preview.src = URL.createObjectURL(file);
-      preview.hidden = false;
-      placeholder.hidden = true;
-    });
+  photoForm.elements.photo.addEventListener("change", (event) => {
+    const file = event.currentTarget.files[0];
+    if (!file) {
+      document.getElementById("upload-photo-button").disabled = true;
+      return;
+    }
+    const preview = document.getElementById("profile-photo-preview");
+    const placeholder = document.getElementById("profile-photo-placeholder");
+    const previousPreviewUrl = preview.dataset.objectUrl;
+    if (previousPreviewUrl) {
+      URL.revokeObjectURL(previousPreviewUrl);
+    }
+    const previewUrl = URL.createObjectURL(file);
+    preview.dataset.objectUrl = previewUrl;
+    preview.src = previewUrl;
+    preview.hidden = false;
+    placeholder.hidden = true;
+    document.getElementById("upload-photo-button").disabled = false;
+  });
 
-  document
-    .getElementById("upload-photo-button")
-    .addEventListener("click", async () => {
-      const photoInput = document.getElementById("profile-photo");
-      const file = photoInput.files[0];
-      if (!file) {
-        showMessage(message, "Selecciona una fotografía primero.", "error");
-        return;
-      }
-      const uploadButton = document.getElementById("upload-photo-button");
-      uploadButton.disabled = true;
-      try {
-        const formData = new FormData();
-        formData.append("photo", file);
-        const result = await apiRequest("/profiles/me/photo", {
-          method: "POST",
-          body: formData,
-        });
-        updateProfilePhotoPreview(result.photo_url);
-        showMessage(message, "La fotografía se subió correctamente.", "success");
-      } catch (error) {
-        showMessage(message, error.message, "error");
-      } finally {
-        uploadButton.disabled = false;
-      }
-    });
+  photoForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const photoInput = photoForm.elements.photo;
+    const file = photoInput.files[0];
+    if (!file) {
+      showMessage(message, "Selecciona una fotografía primero.", "error");
+      return;
+    }
+    const uploadButton = document.getElementById("upload-photo-button");
+    uploadButton.disabled = true;
+    const deleteButton = document.getElementById("delete-photo-button");
+    deleteButton.disabled = true;
+    try {
+      const formData = new FormData();
+      formData.append("photo", file);
+      const result = await apiRequest("/profiles/me/photo", {
+        method: "POST",
+        body: formData,
+      });
+      await updateProfilePhotoPreview(result.photo_url);
+      photoInput.value = "";
+      document.getElementById("upload-photo-button").disabled = true;
+      showMessage(message, "La fotografía se subió correctamente.", "success");
+    } catch (error) {
+      showMessage(message, error.message, "error");
+    } finally {
+      uploadButton.disabled = !photoInput.files.length;
+      deleteButton.disabled = false;
+    }
+  });
 
   document
     .getElementById("delete-photo-button")
     .addEventListener("click", async () => {
+      const deleteButton = document.getElementById("delete-photo-button");
+      const uploadButton = document.getElementById("upload-photo-button");
+      deleteButton.disabled = true;
+      uploadButton.disabled = true;
       try {
         await apiRequest("/profiles/me/photo", { method: "DELETE" });
         document.getElementById("profile-photo").value = "";
-        updateProfilePhotoPreview(null);
+        await updateProfilePhotoPreview(null);
+        document.getElementById("upload-photo-button").disabled = true;
         showMessage(message, "La fotografía se eliminó.", "success");
       } catch (error) {
         showMessage(message, error.message, "error");
+      } finally {
+        deleteButton.disabled = false;
+        uploadButton.disabled =
+          !document.getElementById("profile-photo").files.length;
       }
     });
 
@@ -584,16 +649,63 @@ function updateProfilePhotoPreview(photoUrl) {
   const preview = document.getElementById("profile-photo-preview");
   const placeholder = document.getElementById("profile-photo-placeholder");
   if (!preview || !placeholder) {
-    return;
+    return Promise.resolve();
   }
   if (photoUrl) {
-    preview.src = `${API_BASE_URL}${photoUrl}`;
-    preview.hidden = false;
-    placeholder.hidden = true;
+    const previousPreviewUrl = preview.dataset.objectUrl;
+    if (previousPreviewUrl) {
+      URL.revokeObjectURL(previousPreviewUrl);
+      delete preview.dataset.objectUrl;
+    }
+    const photoToLoad = new Image();
+    const photoSource = absolutePhotoUrl(photoUrl);
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const handleLoad = () => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        preview.src = photoSource;
+        preview.hidden = false;
+        placeholder.hidden = true;
+        resolve();
+      };
+      const handleError = () => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        preview.hidden = true;
+        preview.removeAttribute("src");
+        placeholder.hidden = false;
+        reject(
+          new Error(
+            "La foto se guardó, pero no se pudo cargar desde el servidor.",
+          ),
+        );
+      };
+      photoToLoad.addEventListener("load", handleLoad, { once: true });
+      photoToLoad.addEventListener("error", handleError, { once: true });
+      photoToLoad.src = photoSource;
+      if (photoToLoad.complete) {
+        if (photoToLoad.naturalWidth > 0) {
+          handleLoad();
+        } else {
+          handleError();
+        }
+      }
+    });
   } else {
+    const previousPreviewUrl = preview.dataset.objectUrl;
+    if (previousPreviewUrl) {
+      URL.revokeObjectURL(previousPreviewUrl);
+      delete preview.dataset.objectUrl;
+    }
     preview.removeAttribute("src");
     preview.hidden = true;
     placeholder.hidden = false;
+    return Promise.resolve();
   }
 }
 

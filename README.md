@@ -39,8 +39,9 @@ El token Bearer devuelto por `POST /auth/login` identifica al estudiante.
 
 - `POST /auth/login`: valida credenciales y crea una sesión temporal.
 - `GET /profiles/me`, `PUT /profiles/me`: consulta y edita el perfil propio.
-- `GET /profiles`: explora perfiles no reaccionados; acepta `faculty`, `campus`
-  e `interest` como filtros opcionales.
+- `GET /profiles`: obtiene perfiles no reaccionados; acepta `faculty`, `campus`
+  e `interest` como filtros opcionales. La interfaz muestra uno a la vez y
+  carga el siguiente después de registrar una reacción.
 - `GET /profiles/search`: búsqueda manual; puede incluir perfiles a los que ya
   se reaccionó.
 - `POST /reactions`: registra un `like` o `dislike` inmutable. Un segundo
@@ -51,11 +52,15 @@ El token Bearer devuelto por `POST /auth/login` identifica al estudiante.
 - `GET /matches/{connection_id}/messages`: consulta el chat de un match.
 - `POST /matches/{connection_id}/messages`: envía un mensaje dentro de un match.
 
-Los archivos subidos se guardan en `backend/uploads/` y se sirven desde
-`/uploads/`. Las fotografías sobreviven a los reinicios del backend: el prefijo
-de su archivo se deriva del identificador del estudiante y la API reconstruye
-la URL al consultar los perfiles. El directorio está excluido de Git; los demás
-datos del MVP siguen siendo temporales en memoria.
+Los archivos subidos se guardan en una subcarpeta propia dentro de
+`backend/uploads/` y se sirven desde `/uploads/`. Las fotografías sobreviven a
+los reinicios del backend: cada carpeta corresponde al identificador de un
+estudiante y la API reconstruye la URL al consultar los perfiles. La carga usa
+un archivo temporal y lo publica de forma atómica; al reemplazar o borrar una
+foto, la API elimina los archivos anteriores de ese estudiante y permite volver
+a subir otra inmediatamente. La foto propia aparece junto al saludo y en las
+tarjetas de Descubrir. El directorio está excluido de Git; los demás datos del
+MVP siguen siendo temporales en memoria.
 
 Todas las rutas salvo el login requieren `Authorization: Bearer <token>`.
 Las reacciones no se pueden reemplazar y no tienen aún una regla de repetición

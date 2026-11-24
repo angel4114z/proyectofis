@@ -301,7 +301,7 @@ async def upload_profile_photo(
     content = await photo.read(MAX_PHOTO_SIZE + 1)
     if len(content) > MAX_PHOTO_SIZE:
         raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
             detail="The profile photo must not exceed 5 MB.",
         )
     if not content:
@@ -322,18 +322,17 @@ async def upload_profile_photo(
             detail="The authenticated student does not have a profile.",
         )
     extension = ALLOWED_PHOTO_TYPES[photo.content_type]
-    filename = f"{_photo_stem(student_id)}-{uuid4().hex}{extension}"
-    destination = upload_directory / filename
-    temporary_destination = upload_directory / f".{uuid4().hex}.tmp"
-    temporary_destination.write_bytes(content)
-    temporary_destination.replace(destination)
-    _remove_other_profile_photos(student_id, destination)
-    photo_url = _photo_url_for_student(student_id)
-    if photo_url is None:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="The uploaded photo could not be located.",
-        )
+    profile_directory = upload_directory / _photo_stem(student_id)
+    profile_directory.mkdir(parents=True, exist_ok=True)
+    destination = profile_directory / f"profile-{uuid4().hex}{extension}"
+    temporary_destination = profile_directory / f".{uuid4().hex}.tmp"
+    try:
+        temporary_destination.write_bytes(content)
+        temporary_destination.replace(destination)
+    finally:
+        temporary_destination.unlink(missing_ok=True)
+
+    photo_url = _photo_url_for_path(destination)
     profile = profile_service.update_photo(student_id, photo_url)
     if profile is None:
         destination.unlink(missing_ok=True)
@@ -341,6 +340,7 @@ async def upload_profile_photo(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="The authenticated student does not have a profile.",
         )
+    _remove_other_profile_photos(student_id, destination)
     return PhotoResponse(photo_url=photo_url)
 
 
@@ -452,25 +452,42 @@ def _photo_stem(student_id: str) -> str:
 def _profile_photo_paths(student_id: str) -> list[Path]:
     stem = _photo_stem(student_id)
     legacy_prefix = f"{student_id}-"
-    return [
+    legacy_paths = [
         path
         for path in upload_directory.iterdir()
         if path.is_file()
         and path.suffix in ALLOWED_PHOTO_TYPES.values()
-        and (
-            path.stem == stem
-            or path.stem.startswith(f"{stem}-")
-            or path.name.startswith(legacy_prefix)
-        )
+        and (path.stem.startswith(f"{stem}-") or path.name.startswith(legacy_prefix))
     ]
+    profile_directory = upload_directory / stem
+    if profile_directory.is_dir():
+        legacy_paths.extend(
+            path
+            for path in profile_directory.iterdir()
+            if path.is_file() and path.suffix in ALLOWED_PHOTO_TYPES.values()
+        )
+    return legacy_paths
 
 
 def _photo_url_for_student(student_id: str) -> str | None:
     paths = _profile_photo_paths(student_id)
     if not paths:
         return None
-    latest = max(paths, key=lambda path: path.stat().st_mtime_ns)
-    return f"/uploads/{latest.name}?v={latest.stat().st_mtime_ns}"
+    profile_directory = upload_directory / _photo_stem(student_id)
+    current_paths = [
+        path for path in paths if path.parent == profile_directory
+    ]
+    latest = max(
+        current_paths or paths,
+        key=lambda path: path.stat().st_mtime_ns,
+    )
+    return _photo_url_for_path(latest)
+
+
+def _photo_url_for_path(path: Path) -> str:
+    modified_at = path.stat().st_mtime_ns
+    relative_path = path.relative_to(upload_directory).as_posix()
+    return f"/uploads/{relative_path}?v={modified_at}"
 
 
 def _remove_other_profile_photos(
@@ -479,6 +496,9 @@ def _remove_other_profile_photos(
     for path in _profile_photo_paths(student_id):
         if keep is None or path != keep:
             path.unlink(missing_ok=True)
+    profile_directory = upload_directory / _photo_stem(student_id)
+    if profile_directory.is_dir() and not any(profile_directory.iterdir()):
+        profile_directory.rmdir()
 
 
 def _is_allowed_photo_signature(content_type: str, content: bytes) -> bool:

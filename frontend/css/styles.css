@@ -256,6 +256,32 @@ a:focus-visible {
   margin-bottom: 0;
 }
 
+.student-welcome {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.student-photo,
+.student-photo-placeholder {
+  width: 58px;
+  height: 58px;
+  flex: 0 0 58px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 12px rgb(42 35 75 / 14%);
+  object-fit: cover;
+}
+
+.student-photo-placeholder {
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(135deg, #c83d75, #7d5aa6);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
 .tabs {
   display: flex;
   gap: 8px;
@@ -323,6 +349,44 @@ a:focus-visible {
   object-fit: cover;
 }
 
+.discovery-card {
+  width: min(100%, 520px);
+  overflow: hidden;
+  padding: 0;
+}
+
+.discovery-card .profile-photo {
+  display: block;
+  width: 100%;
+  height: 360px;
+  margin: 0;
+  border-radius: 0;
+  object-fit: cover;
+  object-position: center;
+}
+
+.discovery-card .profile-photo-placeholder {
+  font-size: 3rem;
+}
+
+.discovery-card > .eyebrow,
+.discovery-card > .profile-name,
+.discovery-card > .profile-location,
+.discovery-card > .profile-biography,
+.discovery-card > .profile-interests,
+.discovery-card > .reaction-actions {
+  margin-right: 22px;
+  margin-left: 22px;
+}
+
+.discovery-card > .eyebrow {
+  margin-top: 20px;
+}
+
+.discovery-card > .reaction-actions {
+  margin-bottom: 22px;
+}
+
 .profile-photo-placeholder {
   display: grid;
   place-items: center;
@@ -337,6 +401,7 @@ a:focus-visible {
   width: 150px;
   height: 150px;
   margin-bottom: 12px;
+  object-fit: cover;
 }
 
 .photo-editor {
@@ -501,6 +566,14 @@ a:focus-visible {
 
   .app-toolbar {
     flex-direction: column;
+  }
+
+  .student-welcome {
+    align-items: center;
+  }
+
+  .discovery-card .profile-photo {
+    height: min(68vh, 360px);
   }
 
   .toolbar-actions {
