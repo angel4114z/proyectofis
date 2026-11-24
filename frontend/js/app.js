@@ -453,6 +453,9 @@ async function loadMatches() {
 }
 
 function showView(viewName) {
+  if (viewName === "admin" && state.role !== "administrador") {
+    viewName = "discover";
+  }
   document.querySelectorAll("[data-view]").forEach((button) => {
     const active = button.dataset.view === viewName;
     button.classList.toggle("is-active", active);
@@ -479,6 +482,13 @@ function clearSession() {
   state.role = null;
   state.activeConnectionId = null;
   state.activeReportedStudentId = null;
+  const notificationsPanel = document.getElementById("notifications-panel");
+  if (notificationsPanel) {
+    notificationsPanel.hidden = true;
+    notificationsPanel.open = false;
+    document.getElementById("notification-count").textContent = "0";
+    document.getElementById("notifications-list").replaceChildren();
+  }
 }
 
 async function loadChatConversations(connectionToSelect) {
@@ -837,7 +847,7 @@ async function resolveReport(reportId, confirmed, button) {
 async function loadNotifications() {
   const list = document.getElementById("notifications-list");
   const count = document.getElementById("notification-count");
-  if (!list || !count) {
+  if (!list || !count || state.role !== "administrador") {
     return;
   }
   try {
@@ -877,14 +887,18 @@ function initializeIndexPage() {
     application.hidden = false;
     const isAdministrator = state.role === "administrador";
     document.getElementById("admin-tab").hidden = !isAdministrator;
+    document.getElementById("notifications-panel").hidden = !isAdministrator;
     document.getElementById("edit-profile-link").hidden = isAdministrator;
     document.querySelectorAll("[data-view]").forEach((button) => {
-      button.hidden =
-        isAdministrator && button.dataset.view !== "admin";
+      button.hidden = isAdministrator
+        ? button.dataset.view !== "admin"
+        : button.dataset.view === "admin";
     });
     showStudentHeader(profile);
     showView(isAdministrator ? "admin" : "discover");
-    loadNotifications();
+    if (isAdministrator) {
+      loadNotifications();
+    }
   }
 
   async function completeAuthentication(result, formElement) {
