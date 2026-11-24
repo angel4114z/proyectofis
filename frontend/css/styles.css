@@ -631,12 +631,55 @@ a:focus-visible {
   text-align: right;
 }
 
+/* Se añade una tercera columna auto para el botón de cámara */
 .chat-form {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
   gap: 10px;
   padding: 12px;
   border-top: 1px solid var(--line);
+}
+
+/* Estilo del botón de cámara en el formulario de chat */
+.chat-photo-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--accent-dark);
+  background: #f9eaf1;
+  cursor: pointer;
+  transition: background 140ms ease, transform 140ms ease;
+}
+
+.chat-photo-button:hover {
+  background: #f2d8e5;
+  transform: translateY(-1px);
+}
+
+/* Resalta el botón cuando hay una foto seleccionada para enviar */
+.chat-photo-button.is-selected {
+  border-color: var(--accent);
+  color: #fff;
+  background: var(--accent);
+}
+
+/* Estilo de la imagen renderizada dentro de la burbuja de chat */
+.chat-image {
+  display: block;
+  max-width: 100%;
+  max-height: 260px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+
+.chat-image + span,
+.chat-image + .chat-time {
+  margin-top: 6px;
 }
 
 .sr-only {

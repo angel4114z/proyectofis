@@ -155,13 +155,22 @@
               <div id="chat-messages" class="chat-messages" aria-live="polite"></div>
               <form id="chat-form" class="chat-form">
                 <label class="sr-only" for="chat-text">Mensaje</label>
-                <input id="chat-text" name="text" type="text" maxlength="1000" autocomplete="off" required>
+                <!-- Se quita required para permitir enviar solo una foto -->
+                <input id="chat-text" name="text" type="text" maxlength="1000" autocomplete="off">
+                <!-- Botón visual con ícono de cámara vinculado al input de archivo -->
+                <label class="chat-photo-button" for="chat-photo" title="Enviar foto (hasta 10 MB)">
+                  <span class="sr-only">Enviar foto</span>
+                  <svg class="camera-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14.5 4h-5L7.8 6.2H5a2 2 0 0 0-2 2v9.8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.2a2 2 0 0 0-2-2h-2.8L14.5 4z"></path>
+                    <circle cx="12" cy="13" r="3.5"></circle>
+                  </svg>
+                </label>
+                <input id="chat-photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" class="sr-only">
                 <button class="button button-primary" type="submit">Enviar</button>
               </form>
             </div>
           </div>
         </section>
-      </section>
 
       <footer class="site-footer">
         <p>Proyecto académico · Datos de demostración en memoria</p>

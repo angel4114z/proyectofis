@@ -267,11 +267,13 @@ class InMemoryStore:
                 None,
             )
 
+    # Almacena photo_url en cada mensaje guardado en memoria.
     def create_message(
         self,
         connection_id: str,
         sender_student_id: str,
         text: str,
+        photo_url: str | None = None,
     ) -> Message:
         with self._lock:
             message = Message(
@@ -279,6 +281,7 @@ class InMemoryStore:
                 connection_id=connection_id,
                 sender_student_id=sender_student_id,
                 text=text,
+                photo_url=photo_url,
                 created_at=datetime.now(timezone.utc),
             )
             self._messages.setdefault(connection_id, []).append(message)
