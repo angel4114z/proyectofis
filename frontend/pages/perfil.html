@@ -25,15 +25,13 @@
         <p id="profile-message" class="message" role="status" aria-live="polite"></p>
         <section class="photo-editor" aria-labelledby="photo-title">
           <h2 id="photo-title">Fotografía del perfil</h2>
-          <img id="profile-photo-preview" class="profile-photo profile-photo-preview" alt="Vista previa de la fotografía" hidden>
-          <div id="profile-photo-placeholder" class="profile-photo profile-photo-placeholder">Foto</div>
+          <div id="profile-photo-gallery" class="profile-photo-gallery"></div>
           <form id="photo-form" class="form-stack">
             <label for="profile-photo">Selecciona una imagen</label>
-            <input id="profile-photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" required>
-            <p class="field-help">Al pulsar «Guardar foto» se enviará la imagen al servidor (POST).</p>
+            <input id="profile-photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" multiple required>
+            <p class="field-help">Puedes seleccionar varias fotos. Cada archivo debe ser JPEG, PNG o WebP y pesar hasta 5 MB.</p>
             <div class="toolbar-actions">
-              <button id="upload-photo-button" class="button button-secondary" type="submit" disabled>Guardar foto</button>
-              <button id="delete-photo-button" class="button button-quiet" type="button">Eliminar foto</button>
+              <button id="upload-photo-button" class="button button-secondary" type="submit" disabled>Guardar fotos</button>
             </div>
           </form>
         </section>
@@ -55,7 +53,7 @@
       </section>
 
       <footer class="site-footer">
-        <p>Una fotografía por perfil; formatos JPEG, PNG o WebP, máximo 5 MB.</p>
+        <p>Agrega varias fotografías al perfil y elimina cada una desde su vista previa.</p>
       </footer>
     </main>
   </body>

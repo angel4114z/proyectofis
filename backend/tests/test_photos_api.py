@@ -108,6 +108,7 @@ class ProfilePhotoApiTests(unittest.TestCase):
                 )
                 self.assertEqual(own_profile.status_code, 200)
                 self.assertEqual(own_profile.json()["photo_url"], photo_url)
+                self.assertEqual(own_profile.json()["photo_urls"], [photo_url])
 
                 observer_id = next(
                     candidate
@@ -123,6 +124,7 @@ class ProfilePhotoApiTests(unittest.TestCase):
                     if profile["student_id"] == student_id
                 )
                 self.assertEqual(target_profile["photo_url"], photo_url)
+                self.assertEqual(target_profile["photo_urls"], [photo_url])
 
                 image_response = self.client.get(photo_url)
                 self.assertEqual(image_response.status_code, 200)
@@ -178,7 +180,7 @@ class ProfilePhotoApiTests(unittest.TestCase):
             list(Path(self.uploads_directory.name).rglob("*.png")), []
         )
 
-    def test_replacing_photo_leaves_only_the_current_photo(self) -> None:
+    def test_multiple_photos_are_kept_and_can_be_deleted_individually(self) -> None:
         first = self.client.post(
             "/profiles/me/photo",
             headers=self.headers_by_student["student-2"],
@@ -193,11 +195,72 @@ class ProfilePhotoApiTests(unittest.TestCase):
         self.assertEqual(first.status_code, 200, first.text)
         self.assertEqual(second.status_code, 200, second.text)
         self.assertNotEqual(first.json()["photo_url"], second.json()["photo_url"])
+        self.assertEqual(len(second.json()["photo_urls"]), 2)
         self.assertEqual(
-            self.client.get(first.json()["photo_url"]).status_code, 404
+            self.client.get(first.json()["photo_url"]).status_code, 200
         )
         self.assertEqual(
             self.client.get(second.json()["photo_url"]).status_code, 200
+        )
+        own_profile = self.client.get(
+            "/profiles/me", headers=self.headers_by_student["student-2"]
+        )
+        self.assertEqual(len(own_profile.json()["photo_urls"]), 2)
+        self.assertEqual(
+            own_profile.json()["photo_url"], first.json()["photo_url"]
+        )
+        searched_profile = next(
+            profile
+            for profile in self.client.get(
+                "/profiles/search", headers=self.headers_by_student["student-1"]
+            ).json()
+            if profile["student_id"] == "student-2"
+        )
+        self.assertEqual(len(searched_profile["photo_urls"]), 2)
+
+        store.update_photo("student-2", None)
+        restored_profile = self.client.get(
+            "/profiles/me", headers=self.headers_by_student["student-2"]
+        ).json()
+        self.assertEqual(restored_profile["photo_urls"], own_profile.json()["photo_urls"])
+
+        first_filename = first.json()["photo_url"].split("?")[0].rsplit("/", 1)[1]
+        deleted = self.client.delete(
+            f"/profiles/me/photo/{first_filename}",
+            headers=self.headers_by_student["student-2"],
+        )
+        self.assertEqual(deleted.status_code, 204, deleted.text)
+        remaining_profile = self.client.get(
+            "/profiles/me", headers=self.headers_by_student["student-2"]
+        ).json()
+        self.assertEqual(len(remaining_profile["photo_urls"]), 1)
+        self.assertEqual(
+            remaining_profile["photo_url"], remaining_profile["photo_urls"][0]
+        )
+        self.assertEqual(
+            self.client.get(remaining_profile["photo_url"]).status_code, 200
+        )
+        self.assertEqual(self.client.get(second.json()["photo_url"]).status_code, 404)
+        self.assertEqual(
+            self.client.get(first.json()["photo_url"]).status_code, 404
+        )
+
+    def test_student_cannot_delete_another_students_photo(self) -> None:
+        uploaded = self.client.post(
+            "/profiles/me/photo",
+            headers=self.headers_by_student["student-1"],
+            files={"photo": ("photo.png", _one_pixel_png(), "image/png")},
+        )
+        filename = uploaded.json()["photo_url"].split("?")[0].rsplit("/", 1)[1]
+
+        response = self.client.delete(
+            f"/profiles/me/photo/{filename}",
+            headers=self.headers_by_student["student-2"],
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(
+            self.client.get(uploaded.json()["photo_url"]).status_code, 200
         )
 
     def test_photo_can_be_uploaded_again_after_deletion(self) -> None:

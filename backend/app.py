@@ -97,6 +97,7 @@ class ProfileResponse(BaseModel):
     campus: str
     interests: list[str]
     photo_url: str | None = None
+    photo_urls: list[str] = Field(default_factory=list)
 
 
 class ProfileUpdateRequest(BaseModel):
@@ -127,6 +128,7 @@ class ReactionResponse(BaseModel):
 
 class PhotoResponse(BaseModel):
     photo_url: str
+    photo_urls: list[str]
 
 
 class MessageRequest(BaseModel):
@@ -324,7 +326,14 @@ async def upload_profile_photo(
     extension = ALLOWED_PHOTO_TYPES[photo.content_type]
     profile_directory = upload_directory / _photo_stem(student_id)
     profile_directory.mkdir(parents=True, exist_ok=True)
-    destination = profile_directory / f"profile-{uuid4().hex}{extension}"
+    existing_photos = _profile_photo_paths(student_id)
+    primary_photo = _primary_photo_path(student_id, existing_photos)
+    if primary_photo is None:
+        filename = f"{_photo_stem(student_id)}-primary-{uuid4().hex}{extension}"
+    else:
+        primary_photo = _promote_primary_photo(student_id, primary_photo)
+        filename = f"profile-{uuid4().hex}{extension}"
+    destination = profile_directory / filename
     temporary_destination = profile_directory / f".{uuid4().hex}.tmp"
     try:
         temporary_destination.write_bytes(content)
@@ -340,8 +349,49 @@ async def upload_profile_photo(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="The authenticated student does not have a profile.",
         )
-    _remove_other_profile_photos(student_id, destination)
-    return PhotoResponse(photo_url=photo_url)
+    primary_photo_url = _photo_url_for_student(student_id)
+    profile_service.update_photo(student_id, primary_photo_url)
+    return PhotoResponse(
+        photo_url=photo_url,
+        photo_urls=_photo_urls_for_student(student_id),
+    )
+
+
+@app.delete(
+    "/profiles/me/photo/{photo_filename}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_profile_photo_by_filename(
+    photo_filename: str, student_id: CurrentStudent
+) -> None:
+    profile = profile_service.get_own_profile(student_id)
+    if profile is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The authenticated student does not have a profile.",
+        )
+    photo_path = next(
+        (
+            path
+            for path in _profile_photo_paths(student_id)
+            if path.name == photo_filename
+        ),
+        None,
+    )
+    if photo_path is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The profile photo was not found.",
+        )
+    was_primary = _is_primary_photo(student_id, photo_path)
+    photo_path.unlink()
+    remaining_photos = _profile_photo_paths(student_id)
+    if was_primary and remaining_photos:
+        next_primary = _primary_photo_path(student_id, remaining_photos)
+        if next_primary is not None:
+            _promote_primary_photo(student_id, next_primary)
+    _remove_empty_profile_directory(student_id)
+    profile_service.update_photo(student_id, _photo_url_for_student(student_id))
 
 
 @app.delete("/profiles/me/photo", status_code=status.HTTP_204_NO_CONTENT)
@@ -431,6 +481,7 @@ def _profile_response(profile: Profile) -> ProfileResponse:
         campus=profile.campus,
         interests=list(profile.interests),
         photo_url=_photo_url_for_student(profile.student_id),
+        photo_urls=_photo_urls_for_student(profile.student_id),
     )
 
 
@@ -471,17 +522,49 @@ def _profile_photo_paths(student_id: str) -> list[Path]:
 
 def _photo_url_for_student(student_id: str) -> str | None:
     paths = _profile_photo_paths(student_id)
+    primary_photo = _primary_photo_path(student_id, paths)
+    return _photo_url_for_path(primary_photo) if primary_photo else None
+
+
+def _photo_urls_for_student(student_id: str) -> list[str]:
+    paths = _profile_photo_paths(student_id)
+    primary_photo = _primary_photo_path(student_id, paths)
+    if primary_photo is None:
+        return []
+    remaining = sorted(
+        (path for path in paths if path != primary_photo),
+        key=lambda path: (path.stat().st_mtime_ns, path.name),
+    )
+    return [
+        _photo_url_for_path(path) for path in [primary_photo, *remaining]
+    ]
+
+def _is_primary_photo(student_id: str, path: Path) -> bool:
+    return path.stem.startswith(f"{_photo_stem(student_id)}-primary-")
+
+
+def _primary_photo_path(
+    student_id: str, paths: list[Path]
+) -> Path | None:
     if not paths:
         return None
-    profile_directory = upload_directory / _photo_stem(student_id)
-    current_paths = [
-        path for path in paths if path.parent == profile_directory
-    ]
-    latest = max(
-        current_paths or paths,
-        key=lambda path: path.stat().st_mtime_ns,
+    marked_primary = next(
+        (path for path in paths if _is_primary_photo(student_id, path)),
+        None,
     )
-    return _photo_url_for_path(latest)
+    if marked_primary:
+        return marked_primary
+    return max(paths, key=lambda path: (path.stat().st_mtime_ns, path.name))
+
+
+def _promote_primary_photo(student_id: str, path: Path) -> Path:
+    if _is_primary_photo(student_id, path):
+        return path
+    destination = path.with_name(
+        f"{_photo_stem(student_id)}-primary-{uuid4().hex}{path.suffix}"
+    )
+    path.replace(destination)
+    return destination
 
 
 def _photo_url_for_path(path: Path) -> str:
@@ -496,6 +579,10 @@ def _remove_other_profile_photos(
     for path in _profile_photo_paths(student_id):
         if keep is None or path != keep:
             path.unlink(missing_ok=True)
+    _remove_empty_profile_directory(student_id)
+
+
+def _remove_empty_profile_directory(student_id: str) -> None:
     profile_directory = upload_directory / _photo_stem(student_id)
     if profile_directory.is_dir() and not any(profile_directory.iterdir()):
         profile_directory.rmdir()

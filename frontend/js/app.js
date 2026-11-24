@@ -4,6 +4,7 @@ const TOKEN_KEY = "tinder-ud-access-token";
 const state = {
   token: localStorage.getItem(TOKEN_KEY),
   studentId: null,
+  activeConnectionId: null,
 };
 
 async function apiRequest(path, options = {}) {
@@ -72,6 +73,78 @@ function absolutePhotoUrl(photoUrl) {
   return photoUrl ? new URL(photoUrl, API_BASE_URL).href : null;
 }
 
+function profilePhotos(profile) {
+  if (Array.isArray(profile.photo_urls) && profile.photo_urls.length) {
+    return profile.photo_urls;
+  }
+  return profile.photo_url ? [profile.photo_url] : [];
+}
+
+function showProfileDetail(profile) {
+  const searchForm = document.getElementById("search-form");
+  const searchResults = document.getElementById("search-results");
+  const detail = document.getElementById("profile-detail");
+  const content = document.getElementById("profile-detail-content");
+  const gallery = document.createElement("div");
+  gallery.className = "profile-detail-gallery";
+  const photos = profilePhotos(profile);
+
+  if (photos.length) {
+    photos.forEach((photoUrl, index) => {
+      const photo = document.createElement("img");
+      photo.className = "profile-detail-photo";
+      photo.src = absolutePhotoUrl(photoUrl);
+      photo.alt = `Fotografía ${index + 1} de ${profile.name}`;
+      photo.loading = "lazy";
+      photo.addEventListener(
+        "error",
+        () => photo.replaceWith(createPhotoPlaceholder(profile.name)),
+        { once: true },
+      );
+      gallery.append(photo);
+    });
+  } else {
+    gallery.append(createPhotoPlaceholder(profile.name));
+  }
+
+  const information = document.createElement("div");
+  information.className = "profile-detail-information";
+  information.append(
+    createTextElement("p", "eyebrow", profile.faculty || "Estudiante"),
+    createTextElement("h2", "profile-name", profile.name),
+    createTextElement(
+      "p",
+      "profile-location",
+      profile.campus ? `Sede ${profile.campus}` : "Sede no indicada",
+    ),
+    createTextElement("h3", "", "Biografía"),
+    createTextElement(
+      "p",
+      "profile-biography",
+      profile.biography || "Este estudiante aún no ha agregado una biografía.",
+    ),
+    createTextElement("h3", "", "Intereses"),
+    createTextElement(
+      "p",
+      "profile-interests",
+      profile.interests.length
+        ? profile.interests.join(", ")
+        : "Sin intereses registrados",
+    ),
+  );
+  content.replaceChildren(gallery, information);
+  searchForm.hidden = true;
+  searchResults.hidden = true;
+  detail.hidden = false;
+  document.getElementById("profile-detail-back").focus();
+}
+
+function hideProfileDetail() {
+  document.getElementById("profile-detail").hidden = true;
+  document.getElementById("search-form").hidden = false;
+  document.getElementById("search-results").hidden = false;
+}
+
 function showStudentHeader(profile) {
   const photo = document.getElementById("student-photo");
   const placeholder = document.getElementById("student-photo-placeholder");
@@ -106,10 +179,11 @@ function showStudentHeader(profile) {
 function createProfileCard(profile, options = {}) {
   const card = document.createElement("article");
   card.className = `profile-card${options.showReactions ? " discovery-card" : ""}`;
-  if (profile.photo_url) {
+  const primaryPhotoUrl = profilePhotos(profile)[0];
+  if (primaryPhotoUrl) {
     const photo = document.createElement("img");
     photo.className = "profile-photo";
-    photo.src = absolutePhotoUrl(profile.photo_url);
+    photo.src = absolutePhotoUrl(primaryPhotoUrl);
     photo.alt = `Fotografía de ${profile.name}`;
     photo.loading = "lazy";
     photo.addEventListener(
@@ -146,6 +220,17 @@ function createProfileCard(profile, options = {}) {
         : "Sin intereses registrados",
     ),
   );
+
+  if (options.onViewProfile) {
+    const viewButton = createTextElement(
+      "button",
+      "button button-secondary",
+      "Ver perfil completo",
+    );
+    viewButton.type = "button";
+    viewButton.addEventListener("click", () => options.onViewProfile(profile));
+    card.append(viewButton);
+  }
 
   if (options.showReactions) {
     const actions = document.createElement("div");
@@ -243,7 +328,11 @@ async function searchProfiles(event) {
       results.append(createTextElement("p", "empty-state", "No se encontraron perfiles."));
       return;
     }
-    profiles.forEach((profile) => results.append(createProfileCard(profile)));
+    profiles.forEach((profile) =>
+      results.append(
+        createProfileCard(profile, { onViewProfile: showProfileDetail }),
+      ),
+    );
   } catch (error) {
     results.replaceChildren();
     showMessage(document.getElementById("app-message"), error.message, "error");
@@ -316,23 +405,24 @@ function clearSession() {
   localStorage.removeItem(TOKEN_KEY);
   state.token = null;
   state.studentId = null;
+  state.activeConnectionId = null;
 }
 
 async function loadChatConversations(connectionToSelect) {
-  const select = document.getElementById("chat-conversation");
+  const conversations = document.getElementById("chat-conversations");
   const messages = document.getElementById("chat-messages");
-  if (!select || !messages) {
+  if (!conversations || !messages) {
     return;
   }
   try {
     const matches = await apiRequest("/matches");
-    select.replaceChildren();
+    conversations.replaceChildren();
     if (!matches.length) {
-      const empty = document.createElement("option");
-      empty.textContent = "Aún no tienes matches";
-      empty.value = "";
-      select.append(empty);
+      state.activeConnectionId = null;
       document.getElementById("chat-form").hidden = true;
+      conversations.append(
+        createTextElement("p", "empty-state", "Aún no tienes conexiones."),
+      );
       messages.replaceChildren(
         createTextElement("p", "empty-state", "Necesitas un match para usar el chat."),
       );
@@ -340,18 +430,66 @@ async function loadChatConversations(connectionToSelect) {
     }
     document.getElementById("chat-form").hidden = false;
     matches.forEach((match) => {
-      const option = document.createElement("option");
-      option.value = match.connection_id;
-      option.textContent = match.other_student.name;
-      select.append(option);
+      const connectionButton = document.createElement("button");
+      connectionButton.type = "button";
+      connectionButton.className = "chat-connection-button";
+      connectionButton.dataset.connectionId = match.connection_id;
+      const primaryPhotoUrl = profilePhotos(match.other_student)[0];
+      if (primaryPhotoUrl) {
+        const photo = document.createElement("img");
+        photo.className = "chat-connection-photo";
+        photo.src = absolutePhotoUrl(primaryPhotoUrl);
+        photo.alt = "";
+        photo.addEventListener(
+          "error",
+          () =>
+            photo.replaceWith(
+              createTextElement(
+                "span",
+                "chat-connection-placeholder",
+                match.other_student.name.slice(0, 1).toUpperCase(),
+              ),
+            ),
+          { once: true },
+        );
+        connectionButton.append(photo);
+      } else {
+        connectionButton.append(
+          createTextElement(
+            "span",
+            "chat-connection-placeholder",
+            match.other_student.name.slice(0, 1).toUpperCase(),
+          ),
+        );
+      }
+      connectionButton.append(
+        createTextElement("span", "chat-connection-name", match.other_student.name),
+      );
+      connectionButton.classList.toggle(
+        "is-active",
+        match.connection_id === (connectionToSelect || state.activeConnectionId),
+      );
+      connectionButton.addEventListener("click", () => {
+        state.activeConnectionId = match.connection_id;
+        conversations.querySelectorAll(".chat-connection-button").forEach((item) => {
+          item.classList.toggle("is-active", item === connectionButton);
+        });
+        loadChatMessages(match.connection_id);
+      });
+      conversations.append(connectionButton);
     });
-    if (
-      connectionToSelect &&
-      matches.some((match) => match.connection_id === connectionToSelect)
-    ) {
-      select.value = connectionToSelect;
-    }
-    await loadChatMessages(select.value);
+    const selectedMatch = matches.find(
+      (match) =>
+        match.connection_id === (connectionToSelect || state.activeConnectionId),
+    ) || matches[0];
+    state.activeConnectionId = selectedMatch.connection_id;
+    const selectedButton = [...conversations.querySelectorAll(
+      ".chat-connection-button",
+    )].find(
+      (button) => button.dataset.connectionId === selectedMatch.connection_id,
+    );
+    selectedButton?.classList.add("is-active");
+    await loadChatMessages(selectedMatch.connection_id);
   } catch (error) {
     showMessage(document.getElementById("app-message"), error.message, "error");
   }
@@ -457,13 +595,11 @@ function initializeIndexPage() {
     .addEventListener("click", loadMatches);
   document.getElementById("search-form").addEventListener("submit", searchProfiles);
   document
-    .getElementById("chat-conversation")
-    .addEventListener("change", (event) => {
-      loadChatMessages(event.currentTarget.value);
-    });
+    .getElementById("profile-detail-back")
+    .addEventListener("click", hideProfileDetail);
   document.getElementById("chat-form").addEventListener("submit", async (event) => {
     event.preventDefault();
-    const connectionId = document.getElementById("chat-conversation").value;
+    const connectionId = state.activeConnectionId;
     const textInput = document.getElementById("chat-text");
     const text = textInput.value.trim();
     if (!connectionId || !text) {
@@ -513,30 +649,99 @@ function initializeProfilePage() {
   const photoForm = document.getElementById("photo-form");
   const message = document.getElementById("profile-message");
   const submitButton = form.querySelector('button[type="submit"]');
+  const photoInput = photoForm.elements.photo;
+  const photoGallery = document.getElementById("profile-photo-gallery");
+  let savedPhotoUrls = [];
+  let pendingPhotoUrls = [];
+
+  function renderPhotoGallery(pendingFiles = []) {
+    pendingPhotoUrls.forEach((url) => URL.revokeObjectURL(url));
+    pendingPhotoUrls = [];
+    photoGallery.replaceChildren();
+
+    savedPhotoUrls.forEach((photoUrl, index) => {
+      const item = document.createElement("figure");
+      item.className = "profile-photo-item";
+      const photo = document.createElement("img");
+      photo.src = absolutePhotoUrl(photoUrl);
+      photo.alt = `Fotografía ${index + 1} del perfil`;
+      photo.addEventListener(
+        "error",
+        () => photo.replaceWith(createPhotoPlaceholder("Foto")),
+        { once: true },
+      );
+      item.append(photo);
+      if (index === 0) {
+        item.append(createTextElement("figcaption", "photo-primary-label", "Foto principal"));
+      }
+
+      const filename = new URL(photoUrl, API_BASE_URL).pathname.split("/").pop();
+      const deleteButton = createTextElement(
+        "button",
+        "button button-quiet",
+        "Eliminar",
+      );
+      deleteButton.type = "button";
+      deleteButton.dataset.photoFilename = filename;
+      item.append(deleteButton);
+      photoGallery.append(item);
+    });
+
+    pendingFiles.forEach((file) => {
+      const item = document.createElement("figure");
+      item.className = "profile-photo-item profile-photo-pending";
+      const photo = document.createElement("img");
+      const objectUrl = URL.createObjectURL(file);
+      pendingPhotoUrls.push(objectUrl);
+      photo.src = objectUrl;
+      photo.alt = `Vista previa: ${file.name}`;
+      item.append(photo, createTextElement("figcaption", "", "Pendiente de guardar"));
+      photoGallery.append(item);
+    });
+
+    if (!savedPhotoUrls.length && !pendingFiles.length) {
+      photoGallery.append(
+        createTextElement("p", "muted", "Aún no has agregado fotografías."),
+      );
+    }
+  }
+
+  async function reloadPhotoGallery() {
+    const profile = await apiRequest("/profiles/me");
+    savedPhotoUrls = profile.photo_urls?.length
+      ? profile.photo_urls
+      : profile.photo_url
+        ? [profile.photo_url]
+        : [];
+    renderPhotoGallery();
+  }
 
   if (!state.token) {
     showMessage(message, "Inicia sesión antes de editar tu perfil.", "error");
     form.hidden = true;
+    photoForm.hidden = true;
     return;
   }
 
   apiRequest("/profiles/me")
-    .then(async (profile) => {
+    .then((profile) => {
       document.getElementById("profile-name").textContent = profile.name;
       form.elements.biography.value = profile.biography;
       form.elements.faculty.value = profile.faculty;
       form.elements.campus.value = profile.campus;
       form.elements.interests.value = profile.interests.join(", ");
-      try {
-        await updateProfilePhotoPreview(profile.photo_url);
-      } catch (error) {
-        showMessage(message, error.message, "error");
-      }
+      savedPhotoUrls = profile.photo_urls?.length
+        ? profile.photo_urls
+        : profile.photo_url
+          ? [profile.photo_url]
+          : [];
+      renderPhotoGallery();
       document.getElementById("upload-photo-button").disabled = true;
     })
     .catch((error) => {
       clearSession();
       form.hidden = true;
+      photoForm.hidden = true;
       showMessage(message, error.message, "error");
     });
 
@@ -566,78 +771,93 @@ function initializeProfilePage() {
     }
   });
 
-  photoForm.elements.photo.addEventListener("change", (event) => {
-    const file = event.currentTarget.files[0];
-    if (!file) {
-      document.getElementById("upload-photo-button").disabled = true;
-      return;
-    }
-    const preview = document.getElementById("profile-photo-preview");
-    const placeholder = document.getElementById("profile-photo-placeholder");
-    const previousPreviewUrl = preview.dataset.objectUrl;
-    if (previousPreviewUrl) {
-      URL.revokeObjectURL(previousPreviewUrl);
-    }
-    const previewUrl = URL.createObjectURL(file);
-    preview.dataset.objectUrl = previewUrl;
-    preview.src = previewUrl;
-    preview.hidden = false;
-    placeholder.hidden = true;
-    document.getElementById("upload-photo-button").disabled = false;
+  photoInput.addEventListener("change", () => {
+    const files = Array.from(photoInput.files);
+    renderPhotoGallery(files);
+    document.getElementById("upload-photo-button").disabled = !files.length;
   });
 
   photoForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const photoInput = photoForm.elements.photo;
-    const file = photoInput.files[0];
-    if (!file) {
+    const files = Array.from(photoInput.files);
+    if (!files.length) {
       showMessage(message, "Selecciona una fotografía primero.", "error");
       return;
     }
     const uploadButton = document.getElementById("upload-photo-button");
     uploadButton.disabled = true;
-    const deleteButton = document.getElementById("delete-photo-button");
-    deleteButton.disabled = true;
+    photoGallery.querySelectorAll("button").forEach((button) => {
+      button.disabled = true;
+    });
+    let uploadedCount = 0;
     try {
-      const formData = new FormData();
-      formData.append("photo", file);
-      const result = await apiRequest("/profiles/me/photo", {
-        method: "POST",
-        body: formData,
-      });
-      await updateProfilePhotoPreview(result.photo_url);
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append("photo", file);
+        const result = await apiRequest("/profiles/me/photo", {
+          method: "POST",
+          body: formData,
+        });
+        uploadedCount += 1;
+        await waitForPhotoLoad(result.photo_url);
+      }
+      await reloadPhotoGallery();
       photoInput.value = "";
       document.getElementById("upload-photo-button").disabled = true;
-      showMessage(message, "La fotografía se subió correctamente.", "success");
+      showMessage(
+        message,
+        files.length === 1
+          ? "La fotografía se guardó correctamente."
+          : `Se guardaron ${files.length} fotografías correctamente.`,
+        "success",
+      );
     } catch (error) {
-      showMessage(message, error.message, "error");
+      if (uploadedCount) {
+        try {
+          await reloadPhotoGallery();
+        } catch (reloadError) {
+          showMessage(
+            message,
+            `Se guardaron ${uploadedCount} fotos, pero la galería no pudo actualizarse: ${reloadError.message}`,
+            "error",
+          );
+          return;
+        }
+        photoInput.value = "";
+        showMessage(
+          message,
+          `El servidor aceptó ${uploadedCount} foto(s), pero el lote no se pudo completar o verificar: ${error.message}`,
+          "error",
+        );
+      } else {
+        showMessage(message, error.message, "error");
+      }
     } finally {
       uploadButton.disabled = !photoInput.files.length;
-      deleteButton.disabled = false;
+      photoGallery.querySelectorAll("button").forEach((button) => {
+        button.disabled = false;
+      });
     }
   });
 
-  document
-    .getElementById("delete-photo-button")
-    .addEventListener("click", async () => {
-      const deleteButton = document.getElementById("delete-photo-button");
-      const uploadButton = document.getElementById("upload-photo-button");
-      deleteButton.disabled = true;
-      uploadButton.disabled = true;
-      try {
-        await apiRequest("/profiles/me/photo", { method: "DELETE" });
-        document.getElementById("profile-photo").value = "";
-        await updateProfilePhotoPreview(null);
-        document.getElementById("upload-photo-button").disabled = true;
-        showMessage(message, "La fotografía se eliminó.", "success");
-      } catch (error) {
-        showMessage(message, error.message, "error");
-      } finally {
-        deleteButton.disabled = false;
-        uploadButton.disabled =
-          !document.getElementById("profile-photo").files.length;
-      }
-    });
+  photoGallery.addEventListener("click", async (event) => {
+    const deleteButton = event.target.closest("[data-photo-filename]");
+    if (!deleteButton) {
+      return;
+    }
+    deleteButton.disabled = true;
+    try {
+      await apiRequest(
+        `/profiles/me/photo/${encodeURIComponent(deleteButton.dataset.photoFilename)}`,
+        { method: "DELETE" },
+      );
+      await reloadPhotoGallery();
+      showMessage(message, "La fotografía se eliminó.", "success");
+    } catch (error) {
+      showMessage(message, error.message, "error");
+      deleteButton.disabled = false;
+    }
+  });
 
   document.getElementById("profile-logout-button").addEventListener("click", () => {
     clearSession();
@@ -645,68 +865,24 @@ function initializeProfilePage() {
   });
 }
 
-function updateProfilePhotoPreview(photoUrl) {
-  const preview = document.getElementById("profile-photo-preview");
-  const placeholder = document.getElementById("profile-photo-placeholder");
-  if (!preview || !placeholder) {
-    return Promise.resolve();
-  }
-  if (photoUrl) {
-    const previousPreviewUrl = preview.dataset.objectUrl;
-    if (previousPreviewUrl) {
-      URL.revokeObjectURL(previousPreviewUrl);
-      delete preview.dataset.objectUrl;
-    }
-    const photoToLoad = new Image();
-    const photoSource = absolutePhotoUrl(photoUrl);
-    return new Promise((resolve, reject) => {
-      let settled = false;
-      const handleLoad = () => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        preview.src = photoSource;
-        preview.hidden = false;
-        placeholder.hidden = true;
+function waitForPhotoLoad(photoUrl) {
+  const photo = new Image();
+  return new Promise((resolve, reject) => {
+    photo.addEventListener("load", resolve, { once: true });
+    photo.addEventListener(
+      "error",
+      () => reject(new Error("La foto se guardó, pero no se pudo cargar.")),
+      { once: true },
+    );
+    photo.src = absolutePhotoUrl(photoUrl);
+    if (photo.complete) {
+      if (photo.naturalWidth > 0) {
         resolve();
-      };
-      const handleError = () => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        preview.hidden = true;
-        preview.removeAttribute("src");
-        placeholder.hidden = false;
-        reject(
-          new Error(
-            "La foto se guardó, pero no se pudo cargar desde el servidor.",
-          ),
-        );
-      };
-      photoToLoad.addEventListener("load", handleLoad, { once: true });
-      photoToLoad.addEventListener("error", handleError, { once: true });
-      photoToLoad.src = photoSource;
-      if (photoToLoad.complete) {
-        if (photoToLoad.naturalWidth > 0) {
-          handleLoad();
-        } else {
-          handleError();
-        }
+      } else {
+        reject(new Error("La foto se guardó, pero no se pudo cargar."));
       }
-    });
-  } else {
-    const previousPreviewUrl = preview.dataset.objectUrl;
-    if (previousPreviewUrl) {
-      URL.revokeObjectURL(previousPreviewUrl);
-      delete preview.dataset.objectUrl;
     }
-    preview.removeAttribute("src");
-    preview.hidden = true;
-    placeholder.hidden = false;
-    return Promise.resolve();
-  }
+  });
 }
 
 document.addEventListener("DOMContentLoaded", () => {

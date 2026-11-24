@@ -396,21 +396,90 @@ a:focus-visible {
   letter-spacing: 0.04em;
 }
 
-.profile-photo-preview {
-  display: block;
-  width: 150px;
-  height: 150px;
-  margin-bottom: 12px;
-  object-fit: cover;
-}
-
 .photo-editor {
   display: grid;
-  justify-items: start;
   gap: 10px;
   margin-bottom: 8px;
   padding-bottom: 18px;
   border-bottom: 1px solid var(--line);
+}
+
+.profile-photo-gallery,
+.profile-detail-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+
+.profile-photo-item {
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.profile-photo-item > img,
+.profile-photo-item > .profile-photo-placeholder {
+  width: 100%;
+  height: 150px;
+  margin: 0;
+  border-radius: 10px;
+  object-fit: cover;
+}
+
+.profile-photo-item > .profile-photo-placeholder {
+  display: grid;
+}
+
+.photo-primary-label {
+  color: var(--accent-dark);
+  font-size: 0.8rem;
+  font-weight: 750;
+}
+
+.profile-photo-pending {
+  border-style: dashed;
+}
+
+.profile-detail {
+  margin-top: 20px;
+}
+
+.profile-detail-gallery {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  margin: 20px 0;
+}
+
+.profile-detail-photo,
+.profile-detail-gallery > .profile-photo-placeholder {
+  width: 100%;
+  height: 290px;
+  margin: 0;
+  border-radius: 16px;
+  object-fit: cover;
+}
+
+.profile-detail-gallery > .profile-photo-placeholder {
+  display: grid;
+}
+
+.profile-detail-information {
+  max-width: 720px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+}
+
+.profile-detail-information h3 {
+  margin: 22px 0 8px;
 }
 
 .profile-name {
@@ -469,13 +538,59 @@ a:focus-visible {
   background: #fbfafc;
 }
 
-.chat-conversations select {
+.chat-conversations h3 {
+  margin: 0;
+}
+
+.chat-conversation-list {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.chat-connection-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   width: 100%;
-  min-height: 42px;
+  min-height: 58px;
   padding: 8px;
-  border: 1px solid #dcd9e7;
-  border-radius: 9px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: var(--ink);
   background: #fff;
+  cursor: pointer;
+  text-align: left;
+}
+
+.chat-connection-button:hover,
+.chat-connection-button.is-active {
+  border-color: rgb(200 61 117 / 28%);
+  background: #f9eaf1;
+}
+
+.chat-connection-photo,
+.chat-connection-placeholder {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.chat-connection-placeholder {
+  display: grid;
+  place-items: center;
+  color: white;
+  background: linear-gradient(135deg, #c83d75, #7d5aa6);
+  font-weight: 750;
+}
+
+.chat-connection-name {
+  overflow: hidden;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chat-panel {
