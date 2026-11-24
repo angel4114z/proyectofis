@@ -4,12 +4,24 @@ import hashlib
 import hmac
 import secrets
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from enum import Enum
 
 from .contratos import AccountRepository, SessionRepository
 
 _PASSWORD_HASH_ITERATIONS = 260_000
 _ALLOWED_EMAIL_DOMAINS = ("@gmail.com", "@hotmail.com")
 _MIN_PASSWORD_LENGTH = 8
+
+
+class AccountRole(str, Enum):
+    STUDENT = "estudiante"
+    ADMINISTRATOR = "administrador"
+
+
+class AccountStatus(str, Enum):
+    ACTIVE = "activa"
+    SUSPENDED = "suspendida"
 
 
 class EmailAlreadyRegisteredError(Exception):
@@ -24,6 +36,16 @@ class WeakPasswordError(Exception):
     """Raised when attempting to register with a password shorter than 8 characters."""
 
 
+class AccountSuspendedError(Exception):
+    """Raised when a suspended account attempts to access the application."""
+
+
+class AccountPenalizedError(Exception):
+    def __init__(self, penalized_until: datetime) -> None:
+        self.penalized_until = penalized_until
+        super().__init__("The account is penalized.")
+
+
 @dataclass(frozen=True)
 class Student:
     id: str
@@ -31,6 +53,9 @@ class Student:
     name: str
     password_salt: bytes
     password_digest: bytes
+    role: AccountRole = AccountRole.STUDENT
+    account_status: AccountStatus = AccountStatus.ACTIVE
+    penalized_until: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -50,6 +75,7 @@ class AuthenticatedStudent:
     email: str
     name: str
     access_token: str
+    role: AccountRole
 
 
 class AuthService:
@@ -67,6 +93,7 @@ class AuthService:
             password, student.password_salt, student.password_digest
         ):
             return None
+        self.ensure_account_access(student.id)
 
         token = self._sessions.create_session(student.id)
         return AuthenticatedStudent(
@@ -74,6 +101,7 @@ class AuthService:
             email=student.email,
             name=student.name,
             access_token=token,
+            role=student.role,
         )
 
     def register(self, registration: StudentRegistration) -> AuthenticatedStudent:
@@ -115,10 +143,26 @@ class AuthService:
             email=student.email,
             name=student.name,
             access_token=token,
+            role=AccountRole.STUDENT,
         )
 
     def student_id_for_token(self, token: str) -> str | None:
         return self._sessions.find_student_id(token)
+
+    def account_for_student_id(self, student_id: str) -> Student | None:
+        return self._accounts.find_account_by_student_id(student_id)
+
+    def ensure_account_access(self, student_id: str) -> Student:
+        student = self.account_for_student_id(student_id)
+        if student is None:
+            raise AccountSuspendedError
+        if student.account_status is AccountStatus.SUSPENDED:
+            raise AccountSuspendedError
+        if student.penalized_until and student.penalized_until > datetime.now(
+            timezone.utc
+        ):
+            raise AccountPenalizedError(student.penalized_until)
+        return student
 
 
 def hash_password(password: str, salt: bytes) -> bytes:

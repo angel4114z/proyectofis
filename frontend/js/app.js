@@ -8,7 +8,9 @@ const ALLOWED_CHAT_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const state = {
   token: localStorage.getItem(TOKEN_KEY),
   studentId: null,
+  role: null,
   activeConnectionId: null,
+  activeReportedStudentId: null,
 };
 
 async function apiRequest(path, options = {}) {
@@ -451,6 +453,9 @@ async function loadMatches() {
 }
 
 function showView(viewName) {
+  if (viewName === "admin" && state.role !== "administrador") {
+    viewName = "discover";
+  }
   document.querySelectorAll("[data-view]").forEach((button) => {
     const active = button.dataset.view === viewName;
     button.classList.toggle("is-active", active);
@@ -465,6 +470,8 @@ function showView(viewName) {
     loadMatches();
   } else if (viewName === "chat") {
     loadChatConversations();
+  } else if (viewName === "admin") {
+    loadAdminPanel();
   }
 }
 
@@ -472,7 +479,16 @@ function clearSession() {
   localStorage.removeItem(TOKEN_KEY);
   state.token = null;
   state.studentId = null;
+  state.role = null;
   state.activeConnectionId = null;
+  state.activeReportedStudentId = null;
+  const notificationsPanel = document.getElementById("notifications-panel");
+  if (notificationsPanel) {
+    notificationsPanel.hidden = true;
+    notificationsPanel.open = false;
+    document.getElementById("notification-count").textContent = "0";
+    document.getElementById("notifications-list").replaceChildren();
+  }
 }
 
 async function loadChatConversations(connectionToSelect) {
@@ -486,7 +502,12 @@ async function loadChatConversations(connectionToSelect) {
     conversations.replaceChildren();
     if (!matches.length) {
       state.activeConnectionId = null;
+      state.activeReportedStudentId = null;
       document.getElementById("chat-form").hidden = true;
+      document.getElementById("report-user-button").hidden = true;
+      document.getElementById("report-form").hidden = true;
+      document.getElementById("chat-selected-name").textContent =
+        "Selecciona una conexión";
       conversations.append(
         createTextElement("p", "empty-state", "Aún no tienes conexiones."),
       );
@@ -538,6 +559,12 @@ async function loadChatConversations(connectionToSelect) {
       );
       connectionButton.addEventListener("click", () => {
         state.activeConnectionId = match.connection_id;
+        state.activeReportedStudentId = match.other_student.student_id;
+        document.getElementById("chat-selected-name").textContent =
+          match.other_student.name;
+        document.getElementById("report-target-name").textContent =
+          match.other_student.name;
+        document.getElementById("report-form").hidden = true;
         conversations.querySelectorAll(".chat-connection-button").forEach((item) => {
           item.classList.toggle("is-active", item === connectionButton);
         });
@@ -550,6 +577,13 @@ async function loadChatConversations(connectionToSelect) {
         match.connection_id === (connectionToSelect || state.activeConnectionId),
     ) || matches[0];
     state.activeConnectionId = selectedMatch.connection_id;
+    state.activeReportedStudentId = selectedMatch.other_student.student_id;
+    document.getElementById("chat-selected-name").textContent =
+      selectedMatch.other_student.name;
+    document.getElementById("report-target-name").textContent =
+      selectedMatch.other_student.name;
+    document.getElementById("report-user-button").hidden = false;
+    document.getElementById("report-form").hidden = true;
     const selectedButton = [...conversations.querySelectorAll(
       ".chat-connection-button",
     )].find(
@@ -614,6 +648,226 @@ async function loadChatMessages(connectionId) {
   }
 }
 
+function formatReportCause(cause) {
+  const labels = {
+    acoso: "Acoso",
+    spam: "Spam",
+    perfil_falso: "Perfil falso",
+    contenido_inapropiado: "Contenido inapropiado",
+    otro: "Otro",
+  };
+  return labels[cause] || cause;
+}
+
+function createReportCard(report) {
+  const card = document.createElement("article");
+  card.className = "panel admin-report-card";
+  card.append(
+    createTextElement(
+      "p",
+      "eyebrow",
+      `${formatReportCause(report.cause)} · ${report.status}`,
+    ),
+    createTextElement("h3", "", `${report.reported_name} — denunciado`),
+    createTextElement("p", "", `Reportado por: ${report.reporter_name}`),
+    createTextElement(
+      "p",
+      "muted",
+      new Date(report.created_at).toLocaleString("es-CO"),
+    ),
+  );
+  if (report.description) {
+    card.append(createTextElement("p", "", `Descripción: ${report.description}`));
+  }
+
+  const transcript = document.createElement("details");
+  transcript.className = "report-transcript";
+  transcript.append(createTextElement("summary", "", "Ver mensajes de la conexión"));
+  const messages = document.createElement("div");
+  messages.className = "report-transcript-messages";
+  if (report.messages.length) {
+    report.messages.forEach((message) => {
+      const item = document.createElement("article");
+      item.className = "report-transcript-message";
+      const sender =
+        message.sender_student_id === report.reporter_student_id
+          ? report.reporter_name
+          : report.reported_name;
+      item.append(
+        createTextElement("strong", "", sender),
+        createTextElement("p", "", message.text || "Fotografía adjunta"),
+      );
+      if (message.photo_url) {
+        const photo = document.createElement("img");
+        photo.src = absolutePhotoUrl(message.photo_url);
+        photo.alt = `Imagen compartida por ${sender}`;
+        item.append(photo);
+      }
+      messages.append(item);
+    });
+  } else {
+    messages.append(
+      createTextElement("p", "muted", "La conversación no contiene mensajes."),
+    );
+  }
+  transcript.append(messages);
+  card.append(transcript);
+
+  if (report.status === "pendiente") {
+    const actions = document.createElement("div");
+    actions.className = "toolbar-actions";
+    const confirmButton = createTextElement(
+      "button",
+      "button button-primary",
+      "Confirmar y suspender cuenta",
+    );
+    confirmButton.type = "button";
+    confirmButton.addEventListener("click", () =>
+      resolveReport(report.id, true, confirmButton),
+    );
+    const dismissButton = createTextElement(
+      "button",
+      "button button-secondary",
+      "Descartar y penalizar denunciante (3 días)",
+    );
+    dismissButton.type = "button";
+    dismissButton.addEventListener("click", () =>
+      resolveReport(report.id, false, dismissButton),
+    );
+    actions.append(confirmButton, dismissButton);
+    card.append(actions);
+  }
+  return card;
+}
+
+async function loadAdminPanel() {
+  const reportsElement = document.getElementById("admin-reports");
+  const accountsElement = document.getElementById("admin-suspended-accounts");
+  reportsElement.replaceChildren(
+    createTextElement("p", "muted", "Cargando reportes..."),
+  );
+  try {
+    const [reports, accounts] = await Promise.all([
+      apiRequest("/admin/reports"),
+      apiRequest("/admin/accounts/suspended"),
+    ]);
+    reportsElement.replaceChildren();
+    const pendingReports = reports.filter(
+      (report) => report.status === "pendiente",
+    );
+    if (!reports.length) {
+      reportsElement.append(
+        createTextElement("p", "empty-state", "No hay reportes registrados."),
+      );
+    } else {
+      if (pendingReports.length) {
+        reportsElement.append(
+          createTextElement("h3", "", "Pendientes de revisión"),
+        );
+        pendingReports.forEach((report) =>
+          reportsElement.append(createReportCard(report)),
+        );
+      }
+      const completedReports = reports.filter(
+        (report) => report.status !== "pendiente",
+      );
+      if (completedReports.length) {
+        reportsElement.append(createTextElement("h3", "", "Historial"));
+        completedReports.forEach((report) =>
+          reportsElement.append(createReportCard(report)),
+        );
+      }
+    }
+
+    accountsElement.replaceChildren();
+    if (!accounts.length) {
+      accountsElement.append(
+        createTextElement("p", "muted", "No hay cuentas suspendidas."),
+      );
+    } else {
+      accounts.forEach((account) => {
+        const row = document.createElement("div");
+        row.className = "admin-account-row";
+        row.append(
+          createTextElement("span", "", `${account.name} (${account.email})`),
+        );
+        const reactivateButton = createTextElement(
+          "button",
+          "button button-secondary",
+          "Reactivar",
+        );
+        reactivateButton.type = "button";
+        reactivateButton.addEventListener("click", async () => {
+          reactivateButton.disabled = true;
+          try {
+            await apiRequest(
+              `/admin/accounts/${encodeURIComponent(account.student_id)}/reactivate`,
+              { method: "POST" },
+            );
+            await loadAdminPanel();
+            showMessage(
+              document.getElementById("app-message"),
+              `La cuenta de ${account.name} fue reactivada.`,
+              "success",
+            );
+          } catch (error) {
+            showMessage(
+              document.getElementById("app-message"),
+              error.message,
+              "error",
+            );
+            reactivateButton.disabled = false;
+          }
+        });
+        row.append(reactivateButton);
+        accountsElement.append(row);
+      });
+    }
+  } catch (error) {
+    reportsElement.replaceChildren();
+    showMessage(document.getElementById("app-message"), error.message, "error");
+  }
+}
+
+async function resolveReport(reportId, confirmed, button) {
+  button.disabled = true;
+  try {
+    const result = await apiRequest(
+      `/admin/reports/${encodeURIComponent(reportId)}/resolve`,
+      { method: "POST", body: { confirmed } },
+    );
+    showMessage(document.getElementById("app-message"), result.message, "success");
+    await Promise.all([loadAdminPanel(), loadNotifications()]);
+  } catch (error) {
+    showMessage(document.getElementById("app-message"), error.message, "error");
+    button.disabled = false;
+  }
+}
+
+async function loadNotifications() {
+  const list = document.getElementById("notifications-list");
+  const count = document.getElementById("notification-count");
+  if (!list || !count || state.role !== "administrador") {
+    return;
+  }
+  try {
+    const notifications = await apiRequest("/notifications");
+    count.textContent = String(notifications.length);
+    list.replaceChildren();
+    if (!notifications.length) {
+      list.append(createTextElement("p", "muted", "No tienes notificaciones."));
+      return;
+    }
+    notifications.forEach((notification) => {
+      const item = createTextElement("p", "notification-item", notification.message);
+      item.title = new Date(notification.created_at).toLocaleString("es-CO");
+      list.append(item);
+    });
+  } catch (error) {
+    showMessage(document.getElementById("app-message"), error.message, "error");
+  }
+}
+
 function initializeIndexPage() {
   const loginPanel = document.getElementById("login-panel");
   const application = document.getElementById("application");
@@ -628,22 +882,40 @@ function initializeIndexPage() {
   const appMessage = document.getElementById("app-message");
 
   function showApplication(profile) {
+    state.role = profile.role || "estudiante";
     loginPanel.hidden = true;
     application.hidden = false;
+    const isAdministrator = state.role === "administrador";
+    document.getElementById("admin-tab").hidden = !isAdministrator;
+    document.getElementById("notifications-panel").hidden = !isAdministrator;
+    document.getElementById("edit-profile-link").hidden = isAdministrator;
+    document.querySelectorAll("[data-view]").forEach((button) => {
+      button.hidden = isAdministrator
+        ? button.dataset.view !== "admin"
+        : button.dataset.view === "admin";
+    });
     showStudentHeader(profile);
-    showView("discover");
+    showView(isAdministrator ? "admin" : "discover");
+    if (isAdministrator) {
+      loadNotifications();
+    }
   }
 
   async function completeAuthentication(result, formElement) {
     state.token = result.access_token;
     state.studentId = result.student.id;
+    state.role = result.student.role;
     localStorage.setItem(TOKEN_KEY, state.token);
     formElement.reset();
     showMessage(loginMessage, "");
     showMessage(appMessage, "");
     showApplication(result.student);
+    if (state.role === "administrador") {
+      return;
+    }
     const profile = await apiRequest("/profiles/me");
     state.studentId = profile.student_id;
+    profile.role = state.role;
     showStudentHeader(profile);
   }
 
@@ -763,6 +1035,62 @@ function initializeIndexPage() {
   document
     .getElementById("profile-detail-back")
     .addEventListener("click", hideProfileDetail);
+  document
+    .getElementById("refresh-admin-button")
+    .addEventListener("click", loadAdminPanel);
+  document.getElementById("report-user-button").addEventListener("click", () => {
+    if (!state.activeReportedStudentId) {
+      return;
+    }
+    document.getElementById("report-target-name").textContent =
+      document.getElementById("chat-selected-name").textContent;
+    document.getElementById("report-form").hidden = false;
+    document.getElementById("report-cause").focus();
+  });
+  document
+    .getElementById("cancel-report-button")
+    .addEventListener("click", () => {
+      document.getElementById("report-form").reset();
+      document.getElementById("report-form").hidden = true;
+    });
+  document.getElementById("report-cause").addEventListener("change", (event) => {
+    document.getElementById("report-description").required =
+      event.currentTarget.value === "otro";
+  });
+  document.getElementById("report-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!state.activeConnectionId || !state.activeReportedStudentId) {
+      return;
+    }
+    const form = event.currentTarget;
+    const submitButton = form.querySelector('button[type="submit"]');
+    const formData = new FormData(form);
+    submitButton.disabled = true;
+    try {
+      await apiRequest("/reports", {
+        method: "POST",
+        body: {
+          target_student_id: state.activeReportedStudentId,
+          connection_id: state.activeConnectionId,
+          cause: formData.get("cause"),
+          description: formData.get("description"),
+        },
+      });
+      form.reset();
+      document.getElementById("report-description").required = false;
+      form.hidden = true;
+      showMessage(
+        appMessage,
+        "El reporte se envió al equipo administrativo para revisión.",
+        "success",
+      );
+      await loadNotifications();
+    } catch (error) {
+      showMessage(appMessage, error.message, "error");
+    } finally {
+      submitButton.disabled = false;
+    }
+  });
 
   // Marca visualmente la selección de archivo y valida/sube la foto antes de enviar el mensaje
   const chatPhotoInput = document.getElementById("chat-photo");
@@ -862,9 +1190,16 @@ function initializeIndexPage() {
   });
 
   if (state.token) {
-    apiRequest("/profiles/me")
-      .then((profile) => {
-        state.studentId = profile.student_id;
+    apiRequest("/auth/me")
+      .then(async (identity) => {
+        state.studentId = identity.id;
+        state.role = identity.role;
+        if (identity.role === "administrador") {
+          showApplication(identity);
+          return;
+        }
+        const profile = await apiRequest("/profiles/me");
+        profile.role = identity.role;
         showApplication(profile);
       })
       .catch((error) => {

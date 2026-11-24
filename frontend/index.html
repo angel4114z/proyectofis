@@ -74,18 +74,23 @@
             </div>
           </div>
           <div class="toolbar-actions">
-            <a class="button button-secondary" href="pages/perfil.html">Editar perfil</a>
+            <a id="edit-profile-link" class="button button-secondary" href="pages/perfil.html">Editar perfil</a>
             <button id="logout-button" class="button button-quiet" type="button">Salir</button>
           </div>
         </header>
 
         <p id="app-message" class="message" role="status" aria-live="polite"></p>
+        <details id="notifications-panel" class="notifications-panel" hidden>
+          <summary>Notificaciones <span id="notification-count" class="notification-count">0</span></summary>
+          <div id="notifications-list" class="notifications-list"></div>
+        </details>
 
         <nav class="tabs" aria-label="Secciones principales">
           <button class="tab is-active" type="button" data-view="discover">Descubrir</button>
           <button class="tab" type="button" data-view="search">Buscar</button>
           <button class="tab" type="button" data-view="matches">Matches</button>
           <button class="tab" type="button" data-view="chat">Chat</button>
+          <button id="admin-tab" class="tab" type="button" data-view="admin" hidden>Administración</button>
         </nav>
 
         <section id="view-discover" class="view" aria-labelledby="discover-title">
@@ -152,6 +157,28 @@
               <div id="chat-conversations" class="chat-conversation-list"></div>
             </aside>
             <div class="chat-panel">
+              <div class="chat-conversation-heading">
+                <h3 id="chat-selected-name">Selecciona una conexión</h3>
+                <button id="report-user-button" class="button button-quiet" type="button" hidden>Reportar usuario</button>
+              </div>
+              <form id="report-form" class="report-form" hidden>
+                <h3>Reportar a <span id="report-target-name">este usuario</span></h3>
+                <label for="report-cause">Motivo</label>
+                <select id="report-cause" name="cause" required>
+                  <option value="">Selecciona un motivo</option>
+                  <option value="acoso">Acoso</option>
+                  <option value="spam">Spam</option>
+                  <option value="perfil_falso">Perfil falso</option>
+                  <option value="contenido_inapropiado">Contenido inapropiado</option>
+                  <option value="otro">Otro</option>
+                </select>
+                <label for="report-description">Descripción (obligatoria para «Otro»)</label>
+                <textarea id="report-description" name="description" rows="3" maxlength="1000"></textarea>
+                <div class="toolbar-actions">
+                  <button class="button button-primary" type="submit">Enviar reporte</button>
+                  <button id="cancel-report-button" class="button button-quiet" type="button">Cancelar</button>
+                </div>
+              </form>
               <div id="chat-messages" class="chat-messages" aria-live="polite"></div>
               <form id="chat-form" class="chat-form">
                 <label class="sr-only" for="chat-text">Mensaje</label>
@@ -170,6 +197,21 @@
               </form>
             </div>
           </div>
+        </section>
+
+        <section id="view-admin" class="view" aria-labelledby="admin-title" hidden>
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Moderación</p>
+              <h2 id="admin-title">Administración de reportes</h2>
+            </div>
+            <button id="refresh-admin-button" class="button button-secondary" type="button">Actualizar</button>
+          </div>
+          <div id="admin-reports" class="admin-report-list"></div>
+          <section class="admin-suspended-section">
+            <h3>Cuentas suspendidas</h3>
+            <div id="admin-suspended-accounts" class="admin-account-list"></div>
+          </section>
         </section>
 
       <footer class="site-footer">

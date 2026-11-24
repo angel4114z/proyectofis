@@ -1,8 +1,9 @@
 # Tinder UD
 
 MVP académico para facilitar conexiones entre estudiantes mediante perfiles,
-reacciones, fotografías y chat. El backend usa FastAPI; los datos son temporales
-y viven en memoria. No hay integración con PostgreSQL ni registro de cuentas.
+reacciones, fotografías, chat y moderación de reportes. El backend usa FastAPI;
+los datos de cuentas, sesiones, conversaciones y moderación viven en memoria.
+No hay integración con PostgreSQL.
 
 ## Backend
 
@@ -29,6 +30,11 @@ Abre `http://127.0.0.1:5500`. El backend permite solicitudes CORS desde esos
 dos orígenes locales de desarrollo. `FRONTEND_ORIGINS` en `backend/.env` puede
 contener una lista de orígenes separados por comas para otro entorno.
 
+Para habilitar el perfil administrativo, configura `ADMIN_EMAIL` y
+`ADMIN_PASSWORD` en `backend/.env`. Deben definirse ambos valores; si falta uno,
+el backend informa un error de configuración al iniciar. La cuenta administrativa
+no se puede crear desde el formulario de registro.
+
 ### Cuentas de demostración
 
 Las tres cuentas (`ana@demo.test`, `luis@demo.test` y `maria@demo.test`) usan
@@ -53,6 +59,23 @@ El token Bearer devuelto por `POST /auth/login` identifica al estudiante.
 - `DELETE /profiles/me/photo`: elimina todas las fotos del perfil propio.
 - `GET /matches/{connection_id}/messages`: consulta el chat de un match.
 - `POST /matches/{connection_id}/messages`: envía un mensaje dentro de un match.
+- `POST /reports`: reporta a la otra persona desde una conversación.
+- `GET /notifications`: consulta notificaciones de moderación de la sesión.
+- `GET /admin/reports`: permite al administrador revisar reportes y mensajes
+  de la conversación asociada.
+- `POST /admin/reports/{report_id}/resolve`: confirma o descarta un reporte.
+  Confirmarlo suspende la cuenta denunciada; descartarlo penaliza al denunciante
+  durante tres días.
+- `GET /admin/accounts/suspended` y
+  `POST /admin/accounts/{student_id}/reactivate`: consultan y reactivan cuentas
+  suspendidas.
+
+Las causas aceptadas son acoso, spam, perfil falso, contenido inapropiado y
+otro. La causa «otro» requiere una descripción. Los reportes y notificaciones
+son temporales y se pierden al reiniciar el backend; no se asigna el rol
+administrativo mediante el registro. Las decisiones de moderación actualizan el
+reporte, la cuenta y las notificaciones como una sola operación lógica; el
+adaptador PostgreSQL deberá implementarla dentro de una transacción.
 
 Los archivos subidos se guardan en una subcarpeta propia dentro de
 `backend/uploads/` y se sirven desde `/uploads/`. Las fotografías sobreviven a
@@ -92,6 +115,8 @@ antes de implementarlo.
 - persistencia y consulta de mensajes asociados a una conexión;
 - restricciones de acceso para impedir que un no participante consulte o envíe
   mensajes.
+- persistencia y consulta de reportes y notificaciones, suspensión y
+  reactivación de cuentas, y resolución transaccional de reportes.
 
 La operación de registrar una reacción y crear la conexión debe ser atómica en
 PostgreSQL y tener una restricción que impida duplicar una reacción o conexión.

@@ -14,7 +14,14 @@ from .conexion import (
 )
 from .perfil import Profile, ProfileFilters, ProfileUpdate
 from .chat import Message
-from .usuario import Student, StudentRegistration, hash_password
+from .moderacion import Notification, Report, ReportStatus
+from .usuario import (
+    AccountRole,
+    AccountStatus,
+    Student,
+    StudentRegistration,
+    hash_password,
+)
 
 
 class InMemoryStore:
@@ -27,7 +34,35 @@ class InMemoryStore:
         self._reactions: dict[tuple[str, str], Reaction] = {}
         self._connections: dict[tuple[str, str], Connection] = {}
         self._messages: dict[str, list[Message]] = {}
+        self._reports: dict[str, Report] = {}
+        self._notifications: dict[str, list[Notification]] = {}
         self._add_demo_students()
+
+    def configure_administrator(self, email: str, password: str) -> Student:
+        normalized_email = email.strip().lower()
+        if not normalized_email or not password:
+            raise ValueError("Administrator email and password are required.")
+        with self._lock:
+            existing_id = self._student_ids_by_email.get(normalized_email)
+            if existing_id:
+                existing = self._students[existing_id]
+                if existing.role is not AccountRole.ADMINISTRATOR:
+                    raise ValueError(
+                        "The configured administrator email belongs to a student."
+                    )
+                return existing
+            salt = secrets.token_bytes(16)
+            administrator = Student(
+                id=f"admin-{uuid4().hex[:8]}",
+                email=normalized_email,
+                name="Administrador",
+                password_salt=salt,
+                password_digest=hash_password(password, salt),
+                role=AccountRole.ADMINISTRATOR,
+            )
+            self._students[administrator.id] = administrator
+            self._student_ids_by_email[normalized_email] = administrator.id
+            return administrator
 
     def _add_demo_students(self) -> None:
         demo_students = (
@@ -93,6 +128,32 @@ class InMemoryStore:
         with self._lock:
             student_id = self._student_ids_by_email.get(email)
             return self._students.get(student_id) if student_id else None
+
+    def find_account_by_student_id(self, student_id: str) -> Student | None:
+        with self._lock:
+            return self._students.get(student_id)
+
+    def list_accounts(self) -> list[Student]:
+        with self._lock:
+            return list(self._students.values())
+
+    def set_account_status(
+        self,
+        student_id: str,
+        status: AccountStatus,
+        penalized_until: datetime | None,
+    ) -> Student | None:
+        with self._lock:
+            account = self._students.get(student_id)
+            if account is None:
+                return None
+            updated = replace(
+                account,
+                account_status=status,
+                penalized_until=penalized_until,
+            )
+            self._students[student_id] = updated
+            return updated
 
     def create_student_with_profile(
         self,
@@ -290,6 +351,74 @@ class InMemoryStore:
     def list_messages(self, connection_id: str) -> list[Message]:
         with self._lock:
             return list(self._messages.get(connection_id, []))
+
+    def create_report(self, report: Report) -> Report:
+        with self._lock:
+            self._reports[report.id] = report
+            return report
+
+    def list_reports(self) -> list[Report]:
+        with self._lock:
+            return sorted(
+                self._reports.values(),
+                key=lambda report: report.created_at,
+                reverse=True,
+            )
+
+    def find_report(self, report_id: str) -> Report | None:
+        with self._lock:
+            return self._reports.get(report_id)
+
+    def update_report(self, report: Report) -> Report | None:
+        with self._lock:
+            if report.id not in self._reports:
+                return None
+            self._reports[report.id] = report
+            return report
+
+    def create_notification(self, notification: Notification) -> Notification:
+        with self._lock:
+            self._notifications.setdefault(notification.student_id, []).append(
+                notification
+            )
+            return notification
+
+    def complete_report_resolution(
+        self,
+        report: Report,
+        account_student_id: str,
+        account_status: AccountStatus,
+        penalized_until: datetime | None,
+        notifications: tuple[Notification, Notification],
+    ) -> Report | None:
+        with self._lock:
+            current_report = self._reports.get(report.id)
+            account = self._students.get(account_student_id)
+            if (
+                current_report is None
+                or current_report.status is not ReportStatus.PENDING
+                or account is None
+            ):
+                return None
+            self._reports[report.id] = report
+            self._students[account_student_id] = replace(
+                account,
+                account_status=account_status,
+                penalized_until=penalized_until,
+            )
+            for notification in notifications:
+                self._notifications.setdefault(notification.student_id, []).append(
+                    notification
+                )
+            return report
+
+    def list_notifications(self, student_id: str) -> list[Notification]:
+        with self._lock:
+            return sorted(
+                self._notifications.get(student_id, []),
+                key=lambda notification: notification.created_at,
+                reverse=True,
+            )
 
     @staticmethod
     def _normalize_filter(value: str | None) -> str | None:

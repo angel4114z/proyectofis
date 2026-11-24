@@ -1,16 +1,22 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Protocol, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .conexion import Connection, Reaction, ReactionResult, ReactionType
     from .perfil import Profile, ProfileFilters, ProfileUpdate
-    from .usuario import Student, StudentRegistration
+    from .usuario import AccountStatus, Student, StudentRegistration
     from .chat import Message
+    from .moderacion import Notification, Report
 
 
 class AccountRepository(Protocol):
     def find_by_email(self, email: str) -> Student | None: ...
+
+    def find_account_by_student_id(self, student_id: str) -> Student | None: ...
+
+    def list_accounts(self) -> list[Student]: ...
 
     def create_student_with_profile(
         self,
@@ -69,3 +75,37 @@ class MessageRepository(Protocol):
     def list_messages(self, connection_id: str) -> list[Message]: ...
 
     def list_messages(self, connection_id: str) -> list[Message]: ...
+
+
+class ModerationRepository(Protocol):
+    def find_account_by_student_id(self, student_id: str) -> Student | None: ...
+
+    def list_accounts(self) -> list[Student]: ...
+
+    def set_account_status(
+        self,
+        student_id: str,
+        status: AccountStatus,
+        penalized_until: datetime | None,
+    ) -> Student | None: ...
+
+    def create_report(self, report: Report) -> Report: ...
+
+    def list_reports(self) -> list[Report]: ...
+
+    def find_report(self, report_id: str) -> Report | None: ...
+
+    def update_report(self, report: Report) -> Report | None: ...
+
+    def create_notification(self, notification: Notification) -> Notification: ...
+
+    def list_notifications(self, student_id: str) -> list[Notification]: ...
+
+    def complete_report_resolution(
+        self,
+        report: Report,
+        account_student_id: str,
+        account_status: AccountStatus,
+        penalized_until: datetime | None,
+        notifications: tuple[Notification, Notification],
+    ) -> Report | None: ...

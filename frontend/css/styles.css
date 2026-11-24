@@ -595,7 +595,151 @@ a:focus-visible {
 
 .chat-panel {
   display: grid;
-  grid-template-rows: minmax(300px, 1fr) auto;
+  grid-template-rows: auto auto minmax(300px, 1fr) auto;
+  min-width: 0;
+}
+
+.chat-conversation-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.chat-conversation-heading h3 {
+  margin: 0;
+}
+
+.report-form {
+  display: grid;
+  gap: 9px;
+  margin: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fbfafc;
+}
+
+.report-form h3 {
+  margin: 0 0 4px;
+}
+
+.report-form select {
+  min-height: 42px;
+  padding: 8px;
+  border: 1px solid #dcd9e7;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.notifications-panel {
+  margin: 8px 0 18px;
+  padding: 12px 15px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.notifications-panel summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.notification-count {
+  display: inline-grid;
+  min-width: 22px;
+  height: 22px;
+  margin-left: 5px;
+  place-items: center;
+  border-radius: 11px;
+  color: #fff;
+  background: var(--accent);
+  font-size: 0.75rem;
+}
+
+.notifications-list {
+  display: grid;
+  gap: 6px;
+  padding-top: 10px;
+}
+
+.notification-item {
+  margin: 0;
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: #fbfafc;
+  font-size: 0.9rem;
+}
+
+.admin-report-list,
+.admin-account-list {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-report-card {
+  padding: 20px;
+}
+
+.admin-report-card .eyebrow {
+  margin-bottom: 10px;
+}
+
+.report-transcript {
+  margin: 14px 0;
+  padding: 12px;
+  border-radius: 10px;
+  background: #fbfafc;
+}
+
+.report-transcript summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.report-transcript-messages {
+  display: grid;
+  gap: 8px;
+  max-height: 360px;
+  margin-top: 10px;
+  overflow: auto;
+}
+
+.report-transcript-message {
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #fff;
+}
+
+.report-transcript-message p {
+  margin: 4px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.report-transcript-message img {
+  max-width: min(100%, 300px);
+  max-height: 240px;
+  border-radius: 8px;
+  object-fit: contain;
+}
+
+.admin-suspended-section {
+  margin-top: 30px;
+}
+
+.admin-account-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
 }
 
 .chat-messages {

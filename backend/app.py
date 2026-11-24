@@ -29,12 +29,25 @@ from core.conexion import (
     SelfReactionError,
 )
 from core.memoria import InMemoryStore
+from core.moderacion import (
+    InvalidReportError,
+    Report,
+    ReportAlreadyResolvedError,
+    ReportCause,
+    ReportNotFoundError,
+    ReportService,
+)
 from core.perfil import Profile, ProfileFilters, ProfileService, ProfileUpdate
 from core.usuario import (
+    AccountPenalizedError,
+    AccountRole,
+    AccountStatus,
+    AccountSuspendedError,
     AuthService,
     AuthenticatedStudent,
     EmailAlreadyRegisteredError,
     InvalidEmailDomainError,
+    Student,
     StudentRegistration,
     WeakPasswordError,
 )
@@ -60,10 +73,19 @@ app.add_middleware(
 )
 
 store = InMemoryStore()
+admin_email = os.getenv("ADMIN_EMAIL")
+admin_password = os.getenv("ADMIN_PASSWORD")
+if bool(admin_email) != bool(admin_password):
+    raise RuntimeError(
+        "Set both ADMIN_EMAIL and ADMIN_PASSWORD to configure an administrator."
+    )
+if admin_email and admin_password:
+    store.configure_administrator(admin_email, admin_password)
 auth_service = AuthService(store, store)
 profile_service = ProfileService(store, store)
 connection_service = ConnectionService(store, store)
 chat_service = ChatService(store, store)
+report_service = ReportService(store, store, store)
 bearer_scheme = HTTPBearer(auto_error=False)
 
 upload_directory = Path(__file__).resolve().parent / "uploads"
@@ -98,6 +120,7 @@ class StudentIdentity(BaseModel):
     id: str
     email: str
     name: str
+    role: AccountRole
 
 
 class LoginResponse(BaseModel):
@@ -167,6 +190,59 @@ class MessageResponse(BaseModel):
     created_at: str
 
 
+class ReportRequest(BaseModel):
+    target_student_id: str = Field(min_length=1)
+    connection_id: str = Field(min_length=1)
+    cause: ReportCause
+    description: str = Field(default="", max_length=1000)
+
+
+class ReportResolutionRequest(BaseModel):
+    confirmed: bool
+
+
+class AdminReportResponse(BaseModel):
+    id: str
+    reporter_student_id: str
+    reporter_name: str
+    reported_student_id: str
+    reported_name: str
+    connection_id: str
+    cause: ReportCause
+    description: str
+    status: str
+    created_at: str
+    resolved_at: str | None
+    resolved_by: str | None
+    messages: list[MessageResponse]
+
+
+class NotificationResponse(BaseModel):
+    id: str
+    report_id: str
+    message: str
+    created_at: str
+
+
+class ModeratedAccountResponse(BaseModel):
+    student_id: str
+    name: str
+    email: str
+    status: AccountStatus
+
+
+class ReportCreatedResponse(BaseModel):
+    id: str
+    status: str
+    message: str
+
+
+class ReportResolutionResponse(BaseModel):
+    id: str
+    status: str
+    message: str
+
+
 def require_student(
     credentials: Annotated[
         HTTPAuthorizationCredentials | None, Depends(bearer_scheme)
@@ -185,21 +261,71 @@ def require_student(
             detail="The access token is invalid or expired.",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    try:
+        auth_service.ensure_account_access(student_id)
+    except AccountSuspendedError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This account is suspended.",
+        ) from None
+    except AccountPenalizedError as error:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"This account is penalized until {error.penalized_until.isoformat()}.",
+        ) from None
     return student_id
 
 
 CurrentStudent = Annotated[str, Depends(require_student)]
 
 
+def require_administrator(student_id: CurrentStudent) -> str:
+    account = auth_service.account_for_student_id(student_id)
+    if account is None or account.role is not AccountRole.ADMINISTRATOR:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Administrator access is required.",
+        )
+    return student_id
+
+
+CurrentAdministrator = Annotated[str, Depends(require_administrator)]
+
+
 @app.post("/auth/login", response_model=LoginResponse)
 def login(request: LoginRequest) -> LoginResponse:
-    authenticated = auth_service.login(request.email, request.password)
+    try:
+        authenticated = auth_service.login(request.email, request.password)
+    except AccountSuspendedError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="La cuenta está suspendida por decisión administrativa.",
+        ) from None
+    except AccountPenalizedError as error:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "La cuenta está penalizada hasta "
+                f"{error.penalized_until.isoformat()}."
+            ),
+        ) from None
     if authenticated is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password.",
         )
     return _login_response(authenticated)
+
+
+@app.get("/auth/me", response_model=StudentIdentity)
+def get_authenticated_identity(student_id: CurrentStudent) -> StudentIdentity:
+    account = auth_service.account_for_student_id(student_id)
+    if account is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The authenticated account was not found.",
+        )
+    return _student_identity(account)
 
 
 @app.post(
@@ -346,6 +472,124 @@ def get_matches(student_id: CurrentStudent) -> list[MatchResponse]:
             )
         )
     return responses
+
+
+@app.post(
+    "/reports",
+    response_model=ReportCreatedResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def submit_chat_report(
+    request: ReportRequest, student_id: CurrentStudent
+) -> ReportCreatedResponse:
+    try:
+        report = report_service.submit_report(
+            reporter_student_id=student_id,
+            reported_student_id=request.target_student_id,
+            connection_id=request.connection_id,
+            cause=request.cause,
+            description=request.description,
+        )
+    except InvalidReportError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from None
+    return ReportCreatedResponse(
+        id=report.id,
+        status=report.status.value,
+        message="El reporte fue enviado para revisión.",
+    )
+
+
+@app.get("/notifications", response_model=list[NotificationResponse])
+def get_notifications(student_id: CurrentStudent) -> list[NotificationResponse]:
+    return [
+        NotificationResponse(
+            id=notification.id,
+            report_id=notification.report_id,
+            message=notification.message,
+            created_at=notification.created_at.isoformat(),
+        )
+        for notification in report_service.list_notifications(student_id)
+    ]
+
+
+@app.get("/admin/reports", response_model=list[AdminReportResponse])
+def get_admin_reports(
+    administrator_id: CurrentAdministrator,
+) -> list[AdminReportResponse]:
+    reports = report_service.list_reports()
+    return [
+        _admin_report_response(report)
+        for report in reports
+    ]
+
+
+@app.post(
+    "/admin/reports/{report_id}/resolve",
+    response_model=ReportResolutionResponse,
+)
+def resolve_admin_report(
+    report_id: str,
+    request: ReportResolutionRequest,
+    administrator_id: CurrentAdministrator,
+) -> ReportResolutionResponse:
+    try:
+        report = report_service.resolve_report(
+            report_id,
+            administrator_student_id=administrator_id,
+            confirmed=request.confirmed,
+        )
+    except ReportNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The report was not found.",
+        ) from None
+    except ReportAlreadyResolvedError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="The report has already been resolved.",
+        ) from None
+    message = (
+        "El reporte fue confirmado y la cuenta denunciada fue suspendida."
+        if request.confirmed
+        else "El reporte fue descartado y el denunciante fue penalizado por 3 días."
+    )
+    return ReportResolutionResponse(
+        id=report.id,
+        status=report.status.value,
+        message=message,
+    )
+
+
+@app.get(
+    "/admin/accounts/suspended",
+    response_model=list[ModeratedAccountResponse],
+)
+def get_suspended_accounts(
+    administrator_id: CurrentAdministrator,
+) -> list[ModeratedAccountResponse]:
+    return [
+        ModeratedAccountResponse(
+            student_id=account.id,
+            name=account.name,
+            email=account.email,
+            status=account.account_status,
+        )
+        for account in report_service.list_suspended_accounts()
+    ]
+
+
+@app.post("/admin/accounts/{student_id}/reactivate", status_code=204)
+def reactivate_suspended_account(
+    student_id: str, administrator_id: CurrentAdministrator
+) -> None:
+    if not report_service.reactivate_account(student_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The suspended student account was not found.",
+        )
 
 
 @app.post("/profiles/me/photo", response_model=PhotoResponse)
@@ -589,7 +833,45 @@ def _login_response(student: AuthenticatedStudent) -> LoginResponse:
             id=student.id,
             email=student.email,
             name=student.name,
+            role=student.role,
         ),
+    )
+
+
+def _student_identity(student: Student) -> StudentIdentity:
+    return StudentIdentity(
+        id=student.id,
+        email=student.email,
+        name=student.name,
+        role=student.role,
+    )
+
+
+def _admin_report_response(report: Report) -> AdminReportResponse:
+    reporter = auth_service.account_for_student_id(report.reporter_student_id)
+    reported = auth_service.account_for_student_id(report.reported_student_id)
+    if reporter is None or reported is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="A report references an account that no longer exists.",
+        )
+    return AdminReportResponse(
+        id=report.id,
+        reporter_student_id=report.reporter_student_id,
+        reporter_name=reporter.name,
+        reported_student_id=report.reported_student_id,
+        reported_name=reported.name,
+        connection_id=report.connection_id,
+        cause=report.cause,
+        description=report.description,
+        status=report.status.value,
+        created_at=report.created_at.isoformat(),
+        resolved_at=report.resolved_at.isoformat() if report.resolved_at else None,
+        resolved_by=report.resolved_by,
+        messages=[
+            _message_response(message)
+            for message in report_service.messages_for_report(report)
+        ],
     )
 
 
