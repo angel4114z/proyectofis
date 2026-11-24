@@ -5,12 +5,19 @@ from typing import Protocol, TYPE_CHECKING
 if TYPE_CHECKING:
     from .conexion import Connection, Reaction, ReactionResult, ReactionType
     from .perfil import Profile, ProfileFilters, ProfileUpdate
-    from .usuario import Student
+    from .usuario import Student, StudentRegistration
     from .chat import Message
 
 
 class AccountRepository(Protocol):
     def find_by_email(self, email: str) -> Student | None: ...
+
+    def create_student_with_profile(
+        self,
+        registration: StudentRegistration,
+        password_salt: bytes,
+        password_digest: bytes,
+    ) -> Student: ...
 
 
 class SessionRepository(Protocol):

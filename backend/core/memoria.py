@@ -14,7 +14,7 @@ from .conexion import (
 )
 from .perfil import Profile, ProfileFilters, ProfileUpdate
 from .chat import Message
-from .usuario import Student, hash_password
+from .usuario import Student, StudentRegistration, hash_password
 
 
 class InMemoryStore:
@@ -93,6 +93,38 @@ class InMemoryStore:
         with self._lock:
             student_id = self._student_ids_by_email.get(email)
             return self._students.get(student_id) if student_id else None
+
+    def create_student_with_profile(
+        self,
+        registration: StudentRegistration,
+        password_salt: bytes,
+        password_digest: bytes,
+    ) -> Student:
+        with self._lock:
+            normalized_email = registration.email.strip().lower()
+            if normalized_email in self._student_ids_by_email:
+                raise ValueError("Email already registered.")
+
+            student_id = f"student-{uuid4().hex[:8]}"
+            student = Student(
+                id=student_id,
+                email=normalized_email,
+                name=registration.name,
+                password_salt=password_salt,
+                password_digest=password_digest,
+            )
+            self._students[student_id] = student
+            self._student_ids_by_email[normalized_email] = student_id
+            self._profiles[student_id] = Profile(
+                id=f"profile-{student_id}",
+                student_id=student_id,
+                name=registration.name,
+                biography=registration.biography,
+                faculty=registration.faculty,
+                campus=registration.campus,
+                interests=registration.interests,
+            )
+            return student
 
     def create_session(self, student_id: str) -> str:
         with self._lock:

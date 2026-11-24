@@ -30,7 +30,14 @@ from core.conexion import (
 )
 from core.memoria import InMemoryStore
 from core.perfil import Profile, ProfileFilters, ProfileService, ProfileUpdate
-from core.usuario import AuthService, AuthenticatedStudent
+from core.usuario import (
+    AuthService,
+    AuthenticatedStudent,
+    EmailAlreadyRegisteredError,
+    InvalidEmailDomainError,
+    StudentRegistration,
+    WeakPasswordError,
+)
 
 load_dotenv(Path(__file__).with_name(".env"))
 frontend_origins = os.getenv("FRONTEND_ORIGINS")
@@ -74,6 +81,16 @@ ALLOWED_PHOTO_TYPES = {
 class LoginRequest(BaseModel):
     email: str = Field(min_length=1)
     password: str = Field(min_length=1)
+
+
+class RegisterRequest(BaseModel):
+    email: str = Field(min_length=3)
+    password: str = Field(min_length=8)
+    name: str = Field(min_length=1)
+    faculty: str = ""
+    campus: str = ""
+    biography: str = ""
+    interests: list[str] = Field(default_factory=list)
 
 
 class StudentIdentity(BaseModel):
@@ -175,6 +192,41 @@ def login(request: LoginRequest) -> LoginResponse:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password.",
         )
+    return _login_response(authenticated)
+
+
+@app.post(
+    "/auth/register",
+    response_model=LoginResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def register(request: RegisterRequest) -> LoginResponse:
+    registration = StudentRegistration(
+        email=request.email,
+        name=request.name,
+        password=request.password,
+        faculty=request.faculty,
+        campus=request.campus,
+        biography=request.biography,
+        interests=tuple(request.interests),
+    )
+    try:
+        authenticated = auth_service.register(registration)
+    except InvalidEmailDomainError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Solo se permiten correos @gmail.com o @hotmail.com.",
+        ) from None
+    except WeakPasswordError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="La contraseña debe tener al menos 8 caracteres.",
+        ) from None
+    except EmailAlreadyRegisteredError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ya existe una cuenta registrada con este correo.",
+        ) from None
     return _login_response(authenticated)
 
 
@@ -538,6 +590,7 @@ def _photo_urls_for_student(student_id: str) -> list[str]:
     return [
         _photo_url_for_path(path) for path in [primary_photo, *remaining]
     ]
+
 
 def _is_primary_photo(student_id: str, path: Path) -> bool:
     return path.stem.startswith(f"{_photo_stem(student_id)}-primary-")
