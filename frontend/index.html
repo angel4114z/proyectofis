@@ -51,6 +51,7 @@
           <button class="tab is-active" type="button" data-view="discover">Descubrir</button>
           <button class="tab" type="button" data-view="search">Buscar</button>
           <button class="tab" type="button" data-view="matches">Matches</button>
+          <button class="tab" type="button" data-view="chat">Chat</button>
         </nav>
 
         <section id="view-discover" class="view" aria-labelledby="discover-title">
@@ -98,6 +99,29 @@
             <button id="refresh-matches-button" class="button button-secondary" type="button">Actualizar</button>
           </div>
           <div id="matches-results" class="card-grid"></div>
+        </section>
+
+        <section id="view-chat" class="view" aria-labelledby="chat-title" hidden>
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Conexiones disponibles</p>
+              <h2 id="chat-title">Chat</h2>
+            </div>
+          </div>
+          <div class="chat-layout">
+            <aside class="chat-conversations">
+              <label for="chat-conversation">Selecciona una conexión</label>
+              <select id="chat-conversation"></select>
+            </aside>
+            <div class="chat-panel">
+              <div id="chat-messages" class="chat-messages" aria-live="polite"></div>
+              <form id="chat-form" class="chat-form">
+                <label class="sr-only" for="chat-text">Mensaje</label>
+                <input id="chat-text" name="text" type="text" maxlength="1000" autocomplete="off" required>
+                <button class="button button-primary" type="submit">Enviar</button>
+              </form>
+            </div>
+          </div>
         </section>
       </section>
 

@@ -24,6 +24,16 @@
         <p id="profile-name" class="muted"></p>
         <p id="profile-message" class="message" role="status" aria-live="polite"></p>
         <form id="profile-form" class="form-stack">
+          <div class="photo-editor">
+            <img id="profile-photo-preview" class="profile-photo profile-photo-preview" alt="Vista previa de la fotografía" hidden>
+            <div id="profile-photo-placeholder" class="profile-photo profile-photo-placeholder">Foto</div>
+            <label for="profile-photo">Fotografía del perfil</label>
+            <input id="profile-photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp">
+            <div class="toolbar-actions">
+              <button id="upload-photo-button" class="button button-secondary" type="button">Subir fotografía</button>
+              <button id="delete-photo-button" class="button button-quiet" type="button">Eliminar foto</button>
+            </div>
+          </div>
           <label for="profile-biography">Biografía</label>
           <textarea id="profile-biography" name="biography" rows="4" required></textarea>
           <label for="profile-faculty">Facultad</label>
@@ -41,7 +51,7 @@
       </section>
 
       <footer class="site-footer">
-        <p>Las fotografías no están habilitadas en esta etapa del MVP.</p>
+        <p>Una fotografía por perfil; formatos JPEG, PNG o WebP, máximo 5 MB.</p>
       </footer>
     </main>
   </body>

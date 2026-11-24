@@ -3,6 +3,7 @@ const TOKEN_KEY = "tinder-ud-access-token";
 
 const state = {
   token: localStorage.getItem(TOKEN_KEY),
+  studentId: null,
 };
 
 async function apiRequest(path, options = {}) {
@@ -10,15 +11,17 @@ async function apiRequest(path, options = {}) {
   if (state.token) {
     headers.set("Authorization", `Bearer ${state.token}`);
   }
-  if (options.body !== undefined) {
+  const isFormData = options.body instanceof FormData;
+  if (options.body !== undefined && !isFormData) {
     headers.set("Content-Type", "application/json");
   }
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers,
-    body:
-      options.body === undefined
+    body: isFormData
+      ? options.body
+      : options.body === undefined
         ? undefined
         : JSON.stringify(options.body),
   });
@@ -51,9 +54,38 @@ function createTextElement(tagName, className, text) {
   return element;
 }
 
+function createPhotoPlaceholder(name) {
+  const initials = name
+    .split(/\s+/)
+    .map((part) => part[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+  return createTextElement(
+    "div",
+    "profile-photo profile-photo-placeholder",
+    initials,
+  );
+}
+
 function createProfileCard(profile, options = {}) {
   const card = document.createElement("article");
   card.className = "profile-card";
+  if (profile.photo_url) {
+    const photo = document.createElement("img");
+    photo.className = "profile-photo";
+    photo.src = `${API_BASE_URL}${profile.photo_url}`;
+    photo.alt = `Fotografía de ${profile.name}`;
+    photo.loading = "lazy";
+    photo.addEventListener(
+      "error",
+      () => photo.replaceWith(createPhotoPlaceholder(profile.name)),
+      { once: true },
+    );
+    card.append(photo);
+  } else {
+    card.append(createPhotoPlaceholder(profile.name));
+  }
   card.append(createTextElement("p", "eyebrow", profile.faculty || "Estudiante"));
   card.append(createTextElement("h3", "profile-name", profile.name));
   card.append(
@@ -199,6 +231,20 @@ async function loadMatches() {
     }
     matches.forEach((match) => {
       const card = createProfileCard(match.other_student);
+      const chatButton = createTextElement(
+        "button",
+        "button button-primary",
+        "Abrir chat",
+      );
+      chatButton.type = "button";
+      chatButton.addEventListener("click", () => {
+        showView("chat");
+        document.dispatchEvent(
+          new CustomEvent("chat:open", {
+            detail: { connectionId: match.connection_id },
+          }),
+        );
+      });
       card.append(
         createTextElement(
           "p",
@@ -206,6 +252,7 @@ async function loadMatches() {
           `Conexión desde ${new Date(match.created_at).toLocaleDateString("es-CO")}`,
         ),
       );
+      card.append(chatButton);
       results.append(card);
     });
   } catch (error) {
@@ -227,12 +274,94 @@ function showView(viewName) {
     loadDiscovery();
   } else if (viewName === "matches") {
     loadMatches();
+  } else if (viewName === "chat") {
+    loadChatConversations();
   }
 }
 
 function clearSession() {
   localStorage.removeItem(TOKEN_KEY);
   state.token = null;
+  state.studentId = null;
+}
+
+async function loadChatConversations(connectionToSelect) {
+  const select = document.getElementById("chat-conversation");
+  const messages = document.getElementById("chat-messages");
+  if (!select || !messages) {
+    return;
+  }
+  try {
+    const matches = await apiRequest("/matches");
+    select.replaceChildren();
+    if (!matches.length) {
+      const empty = document.createElement("option");
+      empty.textContent = "Aún no tienes matches";
+      empty.value = "";
+      select.append(empty);
+      document.getElementById("chat-form").hidden = true;
+      messages.replaceChildren(
+        createTextElement("p", "empty-state", "Necesitas un match para usar el chat."),
+      );
+      return;
+    }
+    document.getElementById("chat-form").hidden = false;
+    matches.forEach((match) => {
+      const option = document.createElement("option");
+      option.value = match.connection_id;
+      option.textContent = match.other_student.name;
+      select.append(option);
+    });
+    if (
+      connectionToSelect &&
+      matches.some((match) => match.connection_id === connectionToSelect)
+    ) {
+      select.value = connectionToSelect;
+    }
+    await loadChatMessages(select.value);
+  } catch (error) {
+    showMessage(document.getElementById("app-message"), error.message, "error");
+  }
+}
+
+async function loadChatMessages(connectionId) {
+  const messagesElement = document.getElementById("chat-messages");
+  if (!connectionId) {
+    return;
+  }
+  try {
+    const messages = await apiRequest(
+      `/matches/${encodeURIComponent(connectionId)}/messages`,
+    );
+    messagesElement.replaceChildren();
+    if (!messages.length) {
+      messagesElement.append(
+        createTextElement("p", "empty-state", "Aún no hay mensajes."),
+      );
+    } else {
+      messages.forEach((message) => {
+        const ownMessage = message.sender_student_id === state.studentId;
+        const bubble = createTextElement(
+          "div",
+          `chat-bubble${ownMessage ? " chat-bubble-own" : ""}`,
+          message.text,
+        );
+        const time = createTextElement(
+          "time",
+          "chat-time",
+          new Date(message.created_at).toLocaleTimeString("es-CO", {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        );
+        bubble.append(time);
+        messagesElement.append(bubble);
+      });
+      messagesElement.scrollTop = messagesElement.scrollHeight;
+    }
+  } catch (error) {
+    showMessage(document.getElementById("app-message"), error.message, "error");
+  }
 }
 
 function initializeIndexPage() {
@@ -264,6 +393,7 @@ function initializeIndexPage() {
         },
       });
       state.token = result.access_token;
+      state.studentId = result.student.id;
       localStorage.setItem(TOKEN_KEY, state.token);
       loginForm.reset();
       showMessage(loginMessage, "");
@@ -286,6 +416,36 @@ function initializeIndexPage() {
     .getElementById("refresh-matches-button")
     .addEventListener("click", loadMatches);
   document.getElementById("search-form").addEventListener("submit", searchProfiles);
+  document
+    .getElementById("chat-conversation")
+    .addEventListener("change", (event) => {
+      loadChatMessages(event.currentTarget.value);
+    });
+  document.getElementById("chat-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const connectionId = document.getElementById("chat-conversation").value;
+    const textInput = document.getElementById("chat-text");
+    const text = textInput.value.trim();
+    if (!connectionId || !text) {
+      return;
+    }
+    try {
+      await apiRequest(
+        `/matches/${encodeURIComponent(connectionId)}/messages`,
+        {
+          method: "POST",
+          body: { text },
+        },
+      );
+      textInput.value = "";
+      await loadChatMessages(connectionId);
+    } catch (error) {
+      showMessage(appMessage, error.message, "error");
+    }
+  });
+  document.addEventListener("chat:open", (event) => {
+    loadChatConversations(event.detail.connectionId);
+  });
   document.getElementById("logout-button").addEventListener("click", () => {
     clearSession();
     application.hidden = true;
@@ -295,7 +455,10 @@ function initializeIndexPage() {
 
   if (state.token) {
     apiRequest("/profiles/me")
-      .then((profile) => showApplication(profile.name))
+      .then((profile) => {
+        state.studentId = profile.student_id;
+        showApplication(profile.name);
+      })
       .catch((error) => {
         clearSession();
         loginPanel.hidden = false;
@@ -323,6 +486,7 @@ function initializeProfilePage() {
       form.elements.faculty.value = profile.faculty;
       form.elements.campus.value = profile.campus;
       form.elements.interests.value = profile.interests.join(", ");
+      updateProfilePhotoPreview(profile.photo_url);
     })
     .catch((error) => {
       clearSession();
@@ -356,10 +520,81 @@ function initializeProfilePage() {
     }
   });
 
+  document
+    .getElementById("profile-photo")
+    .addEventListener("change", (event) => {
+      const file = event.currentTarget.files[0];
+      if (!file) {
+        return;
+      }
+      const preview = document.getElementById("profile-photo-preview");
+      const placeholder = document.getElementById("profile-photo-placeholder");
+      preview.src = URL.createObjectURL(file);
+      preview.hidden = false;
+      placeholder.hidden = true;
+    });
+
+  document
+    .getElementById("upload-photo-button")
+    .addEventListener("click", async () => {
+      const photoInput = document.getElementById("profile-photo");
+      const file = photoInput.files[0];
+      if (!file) {
+        showMessage(message, "Selecciona una fotografía primero.", "error");
+        return;
+      }
+      const uploadButton = document.getElementById("upload-photo-button");
+      uploadButton.disabled = true;
+      try {
+        const formData = new FormData();
+        formData.append("photo", file);
+        const result = await apiRequest("/profiles/me/photo", {
+          method: "POST",
+          body: formData,
+        });
+        updateProfilePhotoPreview(result.photo_url);
+        showMessage(message, "La fotografía se subió correctamente.", "success");
+      } catch (error) {
+        showMessage(message, error.message, "error");
+      } finally {
+        uploadButton.disabled = false;
+      }
+    });
+
+  document
+    .getElementById("delete-photo-button")
+    .addEventListener("click", async () => {
+      try {
+        await apiRequest("/profiles/me/photo", { method: "DELETE" });
+        document.getElementById("profile-photo").value = "";
+        updateProfilePhotoPreview(null);
+        showMessage(message, "La fotografía se eliminó.", "success");
+      } catch (error) {
+        showMessage(message, error.message, "error");
+      }
+    });
+
   document.getElementById("profile-logout-button").addEventListener("click", () => {
     clearSession();
     window.location.href = "../index.html";
   });
+}
+
+function updateProfilePhotoPreview(photoUrl) {
+  const preview = document.getElementById("profile-photo-preview");
+  const placeholder = document.getElementById("profile-photo-placeholder");
+  if (!preview || !placeholder) {
+    return;
+  }
+  if (photoUrl) {
+    preview.src = `${API_BASE_URL}${photoUrl}`;
+    preview.hidden = false;
+    placeholder.hidden = true;
+  } else {
+    preview.removeAttribute("src");
+    preview.hidden = true;
+    placeholder.hidden = false;
+  }
 }
 
 document.addEventListener("DOMContentLoaded", () => {

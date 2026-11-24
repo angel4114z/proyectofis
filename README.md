@@ -1,9 +1,8 @@
 # Tinder UD
 
 MVP académico para facilitar conexiones entre estudiantes mediante perfiles,
-reacciones y matches. El backend usa FastAPI; los datos son temporales y viven
-en memoria. No hay integración con PostgreSQL, validación de pertenencia
-universitaria, fotos ni registro de cuentas en esta etapa.
+reacciones, fotografías y chat. El backend usa FastAPI; los datos son temporales
+y viven en memoria. No hay integración con PostgreSQL ni registro de cuentas.
 
 ## Backend
 
@@ -47,6 +46,16 @@ El token Bearer devuelto por `POST /auth/login` identifica al estudiante.
 - `POST /reactions`: registra un `like` o `dislike` inmutable. Un segundo
   intento para el mismo par de estudiantes devuelve `409`.
 - `GET /matches`: consulta las conexiones creadas por likes mutuos.
+- `POST /profiles/me/photo`: sube una fotografía JPEG, PNG o WebP de hasta 5 MB.
+- `DELETE /profiles/me/photo`: elimina la fotografía del perfil propio.
+- `GET /matches/{connection_id}/messages`: consulta el chat de un match.
+- `POST /matches/{connection_id}/messages`: envía un mensaje dentro de un match.
+
+Los archivos subidos se guardan en `backend/uploads/` y se sirven desde
+`/uploads/`. Las fotografías sobreviven a los reinicios del backend: el prefijo
+de su archivo se deriva del identificador del estudiante y la API reconstruye
+la URL al consultar los perfiles. El directorio está excluido de Git; los demás
+datos del MVP siguen siendo temporales en memoria.
 
 Todas las rutas salvo el login requieren `Authorization: Bearer <token>`.
 Las reacciones no se pueden reemplazar y no tienen aún una regla de repetición
@@ -66,6 +75,11 @@ antes de implementarlo.
   recíprocas;
 - creación de una única conexión ante likes mutuos, dentro de una transacción;
 - listado de conexiones de un estudiante.
+- persistencia de una URL o identificador de archivo por perfil;
+- almacenamiento de archivos físicos en una ubicación segura;
+- persistencia y consulta de mensajes asociados a una conexión;
+- restricciones de acceso para impedir que un no participante consulte o envíe
+  mensajes.
 
 La operación de registrar una reacción y crear la conexión debe ser atómica en
 PostgreSQL y tener una restricción que impida duplicar una reacción o conexión.

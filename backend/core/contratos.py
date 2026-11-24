@@ -6,6 +6,7 @@ if TYPE_CHECKING:
     from .conexion import Connection, Reaction, ReactionResult, ReactionType
     from .perfil import Profile, ProfileFilters, ProfileUpdate
     from .usuario import Student
+    from .chat import Message
 
 
 class AccountRepository(Protocol):
@@ -29,6 +30,10 @@ class ProfileRepository(Protocol):
         self, student_id: str, profile_update: ProfileUpdate
     ) -> Profile | None: ...
 
+    def update_photo(
+        self, student_id: str, photo_url: str | None
+    ) -> Profile | None: ...
+
 
 class InteractionRepository(Protocol):
     def list_reacted_student_ids(self, student_id: str) -> set[str]: ...
@@ -38,3 +43,18 @@ class InteractionRepository(Protocol):
     ) -> ReactionResult: ...
 
     def list_matches(self, student_id: str) -> list[Connection]: ...
+
+    def find_match(
+        self, connection_id: str
+    ) -> Connection | None: ...
+
+
+class MessageRepository(Protocol):
+    def create_message(
+        self,
+        connection_id: str,
+        sender_student_id: str,
+        text: str,
+    ) -> Message: ...
+
+    def list_messages(self, connection_id: str) -> list[Message]: ...

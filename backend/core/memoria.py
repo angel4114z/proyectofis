@@ -13,6 +13,7 @@ from .conexion import (
     ReactionType,
 )
 from .perfil import Profile, ProfileFilters, ProfileUpdate
+from .chat import Message
 from .usuario import Student, hash_password
 
 
@@ -25,6 +26,7 @@ class InMemoryStore:
         self._profiles: dict[str, Profile] = {}
         self._reactions: dict[tuple[str, str], Reaction] = {}
         self._connections: dict[tuple[str, str], Connection] = {}
+        self._messages: dict[str, list[Message]] = {}
         self._add_demo_students()
 
     def _add_demo_students(self) -> None:
@@ -151,6 +153,17 @@ class InMemoryStore:
             self._profiles[student_id] = updated_profile
             return updated_profile
 
+    def update_photo(
+        self, student_id: str, photo_url: str | None
+    ) -> Profile | None:
+        with self._lock:
+            profile = self._profiles.get(student_id)
+            if profile is None:
+                return None
+            updated_profile = replace(profile, photo_url=photo_url)
+            self._profiles[student_id] = updated_profile
+            return updated_profile
+
     def list_reacted_student_ids(self, student_id: str) -> set[str]:
         with self._lock:
             return {
@@ -210,6 +223,38 @@ class InMemoryStore:
                 if student_id
                 in (connection.first_student_id, connection.second_student_id)
             ]
+
+    def find_match(self, connection_id: str) -> Connection | None:
+        with self._lock:
+            return next(
+                (
+                    connection
+                    for connection in self._connections.values()
+                    if connection.id == connection_id
+                ),
+                None,
+            )
+
+    def create_message(
+        self,
+        connection_id: str,
+        sender_student_id: str,
+        text: str,
+    ) -> Message:
+        with self._lock:
+            message = Message(
+                id=str(uuid4()),
+                connection_id=connection_id,
+                sender_student_id=sender_student_id,
+                text=text,
+                created_at=datetime.now(timezone.utc),
+            )
+            self._messages.setdefault(connection_id, []).append(message)
+            return message
+
+    def list_messages(self, connection_id: str) -> list[Message]:
+        with self._lock:
+            return list(self._messages.get(connection_id, []))
 
     @staticmethod
     def _normalize_filter(value: str | None) -> str | None:

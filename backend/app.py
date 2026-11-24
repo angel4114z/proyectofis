@@ -1,15 +1,24 @@
 from __future__ import annotations
 
+import hashlib
 import os
 from pathlib import Path
 from typing import Annotated
+from uuid import uuid4
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from core.chat import (
+    ChatService,
+    EmptyMessageError,
+    MatchNotFoundError,
+    StudentOutsideMatchError,
+)
 from core.conexion import (
     Connection,
     ConnectionService,
@@ -39,7 +48,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
-    allow_methods=["GET", "POST", "PUT"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["Authorization", "Content-Type"],
 )
 
@@ -47,7 +56,19 @@ store = InMemoryStore()
 auth_service = AuthService(store, store)
 profile_service = ProfileService(store, store)
 connection_service = ConnectionService(store, store)
+chat_service = ChatService(store, store)
 bearer_scheme = HTTPBearer(auto_error=False)
+
+upload_directory = Path(__file__).resolve().parent / "uploads"
+upload_directory.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=upload_directory), name="uploads")
+
+MAX_PHOTO_SIZE = 5 * 1024 * 1024
+ALLOWED_PHOTO_TYPES = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+}
 
 
 class LoginRequest(BaseModel):
@@ -75,6 +96,7 @@ class ProfileResponse(BaseModel):
     faculty: str
     campus: str
     interests: list[str]
+    photo_url: str | None = None
 
 
 class ProfileUpdateRequest(BaseModel):
@@ -86,6 +108,7 @@ class ProfileUpdateRequest(BaseModel):
 
 class MatchResponse(BaseModel):
     id: str
+    connection_id: str
     created_at: str
     other_student: ProfileResponse
 
@@ -100,6 +123,22 @@ class ReactionResponse(BaseModel):
     type: ReactionType
     matched: bool
     match: MatchResponse | None = None
+
+
+class PhotoResponse(BaseModel):
+    photo_url: str
+
+
+class MessageRequest(BaseModel):
+    text: str = Field(min_length=1)
+
+
+class MessageResponse(BaseModel):
+    id: str
+    connection_id: str
+    sender_student_id: str
+    text: str
+    created_at: str
 
 
 def require_student(
@@ -240,11 +279,135 @@ def get_matches(student_id: CurrentStudent) -> list[MatchResponse]:
         responses.append(
             MatchResponse(
                 id=connection.id,
+                connection_id=connection.id,
                 created_at=connection.created_at.isoformat(),
                 other_student=_profile_response(profile),
             )
         )
     return responses
+
+
+@app.post("/profiles/me/photo", response_model=PhotoResponse)
+async def upload_profile_photo(
+    photo: Annotated[UploadFile, File()],
+    student_id: CurrentStudent,
+) -> PhotoResponse:
+    if photo.content_type not in ALLOWED_PHOTO_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Only JPEG, PNG, and WebP images are allowed.",
+        )
+
+    content = await photo.read(MAX_PHOTO_SIZE + 1)
+    if len(content) > MAX_PHOTO_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="The profile photo must not exceed 5 MB.",
+        )
+    if not content:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The selected photo is empty.",
+        )
+    if not _is_allowed_photo_signature(photo.content_type, content):
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="The file contents do not match an allowed image format.",
+        )
+
+    old_profile = profile_service.get_own_profile(student_id)
+    if old_profile is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The authenticated student does not have a profile.",
+        )
+    extension = ALLOWED_PHOTO_TYPES[photo.content_type]
+    filename = f"{_photo_stem(student_id)}-{uuid4().hex}{extension}"
+    destination = upload_directory / filename
+    temporary_destination = upload_directory / f".{uuid4().hex}.tmp"
+    temporary_destination.write_bytes(content)
+    temporary_destination.replace(destination)
+    _remove_other_profile_photos(student_id, destination)
+    photo_url = _photo_url_for_student(student_id)
+    if photo_url is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="The uploaded photo could not be located.",
+        )
+    profile = profile_service.update_photo(student_id, photo_url)
+    if profile is None:
+        destination.unlink(missing_ok=True)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The authenticated student does not have a profile.",
+        )
+    return PhotoResponse(photo_url=photo_url)
+
+
+@app.delete("/profiles/me/photo", status_code=status.HTTP_204_NO_CONTENT)
+def delete_profile_photo(student_id: CurrentStudent) -> None:
+    profile = profile_service.get_own_profile(student_id)
+    if profile is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The authenticated student does not have a profile.",
+        )
+    _remove_other_profile_photos(student_id)
+    profile_service.update_photo(student_id, None)
+
+
+@app.get(
+    "/matches/{connection_id}/messages",
+    response_model=list[MessageResponse],
+)
+def get_match_messages(
+    connection_id: str, student_id: CurrentStudent
+) -> list[MessageResponse]:
+    try:
+        messages = chat_service.list_messages(connection_id, student_id)
+    except MatchNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The connection was not found.",
+        ) from None
+    except StudentOutsideMatchError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="The authenticated student is not part of this connection.",
+        ) from None
+    return [_message_response(message) for message in messages]
+
+
+@app.post(
+    "/matches/{connection_id}/messages",
+    response_model=MessageResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def send_match_message(
+    connection_id: str,
+    request: MessageRequest,
+    student_id: CurrentStudent,
+) -> MessageResponse:
+    try:
+        message = chat_service.send_message(
+            connection_id, student_id, request.text
+        )
+    except MatchNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The connection was not found.",
+        ) from None
+    except StudentOutsideMatchError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="The authenticated student is not part of this connection.",
+        ) from None
+    except EmptyMessageError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The message cannot be empty.",
+        ) from None
+    return _message_response(message)
 
 
 def _login_response(student: AuthenticatedStudent) -> LoginResponse:
@@ -267,7 +430,65 @@ def _profile_response(profile: Profile) -> ProfileResponse:
         faculty=profile.faculty,
         campus=profile.campus,
         interests=list(profile.interests),
+        photo_url=_photo_url_for_student(profile.student_id),
     )
+
+
+def _message_response(message) -> MessageResponse:
+    return MessageResponse(
+        id=message.id,
+        connection_id=message.connection_id,
+        sender_student_id=message.sender_student_id,
+        text=message.text,
+        created_at=message.created_at.isoformat(),
+    )
+
+
+def _photo_stem(student_id: str) -> str:
+    digest = hashlib.sha256(student_id.encode("utf-8")).hexdigest()
+    return f"profile-{digest}"
+
+
+def _profile_photo_paths(student_id: str) -> list[Path]:
+    stem = _photo_stem(student_id)
+    legacy_prefix = f"{student_id}-"
+    return [
+        path
+        for path in upload_directory.iterdir()
+        if path.is_file()
+        and path.suffix in ALLOWED_PHOTO_TYPES.values()
+        and (
+            path.stem == stem
+            or path.stem.startswith(f"{stem}-")
+            or path.name.startswith(legacy_prefix)
+        )
+    ]
+
+
+def _photo_url_for_student(student_id: str) -> str | None:
+    paths = _profile_photo_paths(student_id)
+    if not paths:
+        return None
+    latest = max(paths, key=lambda path: path.stat().st_mtime_ns)
+    return f"/uploads/{latest.name}?v={latest.stat().st_mtime_ns}"
+
+
+def _remove_other_profile_photos(
+    student_id: str, keep: Path | None = None
+) -> None:
+    for path in _profile_photo_paths(student_id):
+        if keep is None or path != keep:
+            path.unlink(missing_ok=True)
+
+
+def _is_allowed_photo_signature(content_type: str, content: bytes) -> bool:
+    if content_type == "image/jpeg":
+        return content.startswith(b"\xff\xd8\xff")
+    if content_type == "image/png":
+        return content.startswith(b"\x89PNG\r\n\x1a\n")
+    if content_type == "image/webp":
+        return content.startswith(b"RIFF") and content[8:12] == b"WEBP"
+    return False
 
 
 def _reaction_response(
@@ -296,6 +517,7 @@ def _match_response_for_reaction(
         )
     return MatchResponse(
         id=connection.id,
+        connection_id=connection.id,
         created_at=connection.created_at.isoformat(),
         other_student=_profile_response(profile),
     )

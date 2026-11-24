@@ -14,6 +14,7 @@ class Profile:
     faculty: str
     campus: str
     interests: tuple[str, ...]
+    photo_url: str | None = None
 
 
 @dataclass(frozen=True)
@@ -74,3 +75,8 @@ class ProfileService:
         self, student_id: str, filters: ProfileFilters
     ) -> list[Profile]:
         return self._profiles.list_profiles(student_id, filters)
+
+    def update_photo(
+        self, student_id: str, photo_url: str | None
+    ) -> Profile | None:
+        return self._profiles.update_photo(student_id, photo_url)

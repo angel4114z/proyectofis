@@ -10,6 +10,11 @@ from core.conexion import (
 from core.memoria import InMemoryStore
 from core.perfil import ProfileFilters, ProfileService, ProfileUpdate
 from core.usuario import AuthService
+from core.chat import (
+    ChatService,
+    MatchNotFoundError,
+    StudentOutsideMatchError,
+)
 
 
 class ApplicationServiceTests(unittest.TestCase):
@@ -18,6 +23,7 @@ class ApplicationServiceTests(unittest.TestCase):
         self.auth = AuthService(self.store, self.store)
         self.profiles = ProfileService(self.store, self.store)
         self.connections = ConnectionService(self.store, self.store)
+        self.chat = ChatService(self.store, self.store)
         self.ana_id = self.auth.login("ana@demo.test", "Demo123!").id
         self.luis_id = self.auth.login("luis@demo.test", "Demo123!").id
 
@@ -114,6 +120,29 @@ class ApplicationServiceTests(unittest.TestCase):
 
         with self.assertRaises(ReactionAlreadyRecordedError):
             self.connections.react(self.ana_id, self.luis_id, ReactionType.LIKE)
+
+    def test_chat_requires_an_existing_match(self) -> None:
+        with self.assertRaises(MatchNotFoundError):
+            self.chat.send_message("missing-connection", self.ana_id, "Hola")
+
+    def test_chat_only_allows_match_participants(self) -> None:
+        self.connections.react(self.ana_id, self.luis_id, ReactionType.LIKE)
+        result = self.connections.react(
+            self.luis_id, self.ana_id, ReactionType.LIKE
+        )
+        connection = result.connection
+
+        self.assertIsNotNone(connection)
+        self.chat.send_message(connection.id, self.ana_id, "Hola Luis")
+        sent = self.chat.send_message(connection.id, self.luis_id, "Hola Ana")
+        messages = self.chat.list_messages(connection.id, self.ana_id)
+
+        self.assertEqual(len(messages), 2)
+        self.assertEqual(messages[-1].id, sent.id)
+
+        maria = self.auth.login("maria@demo.test", "Demo123!").id
+        with self.assertRaises(StudentOutsideMatchError):
+            self.chat.list_messages(connection.id, maria)
 
 
 if __name__ == "__main__":
