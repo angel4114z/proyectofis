@@ -19,9 +19,17 @@
       </header>
 
       <section id="login-panel" class="panel login-panel" aria-labelledby="login-title">
-        <p class="eyebrow">Bienvenido</p>
-        <h1 id="login-title">Inicia sesión</h1>
-        <p class="muted">Ingresa con una cuenta de demostración para explorar.</p>
+        <div class="section-heading">
+          <div>
+            <p id="auth-eyebrow" class="eyebrow">Bienvenido</p>
+            <h1 id="login-title">Inicia sesión</h1>
+          </div>
+          <button id="toggle-auth-mode" class="button button-secondary" type="button">
+            Crear cuenta
+          </button>
+        </div>
+        <p id="auth-subtitle" class="muted">Ingresa con una cuenta existente o crea una nueva para explorar.</p>
+
         <form id="login-form" class="form-stack">
           <label for="login-email">Correo</label>
           <input id="login-email" name="email" type="email" autocomplete="username" required>
@@ -29,8 +37,30 @@
           <input id="login-password" name="password" type="password" autocomplete="current-password" required>
           <button class="button button-primary" type="submit">Entrar</button>
         </form>
+
+        <form id="register-form" class="form-stack" hidden>
+          <label for="register-name">Nombre completo</label>
+          <input id="register-name" name="name" type="text" autocomplete="name" required>
+          <label for="register-email">Correo</label>
+          <input id="register-email" name="email" type="email" autocomplete="email" aria-describedby="register-email-help" required>
+          <p id="register-email-help" class="field-help">Solo se admiten correos @gmail.com o @hotmail.com.</p>
+          <label for="register-password">Contraseña</label>
+          <input id="register-password" name="password" type="password" autocomplete="new-password" minlength="8" aria-describedby="register-password-help" required>
+          <p id="register-password-help" class="field-help">Mínimo 8 caracteres.</p>
+          <label for="register-faculty">Facultad</label>
+          <input id="register-faculty" name="faculty" type="text" required>
+          <label for="register-campus">Sede</label>
+          <input id="register-campus" name="campus" type="text" required>
+          <label for="register-biography">Biografía</label>
+          <textarea id="register-biography" name="biography" rows="3"></textarea>
+          <label for="register-interests">Intereses</label>
+          <input id="register-interests" name="interests" type="text" aria-describedby="register-interests-help">
+          <p id="register-interests-help" class="field-help">Separa cada interés con una coma.</p>
+          <button class="button button-primary" type="submit">Crear cuenta</button>
+        </form>
+
         <p id="login-message" class="message" role="status" aria-live="polite"></p>
-        <p class="demo-hint">Demo: ana@demo.test · Demo123!</p>
+        <p id="demo-hint" class="demo-hint">Demo: ana@demo.test · Demo123!</p>
       </section>
 
       <section id="application" class="application" hidden>

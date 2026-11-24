@@ -80,6 +80,7 @@ function profilePhotos(profile) {
   return profile.photo_url ? [profile.photo_url] : [];
 }
 
+
 function showProfileDetail(profile) {
   const searchForm = document.getElementById("search-form");
   const searchResults = document.getElementById("search-results");
@@ -107,6 +108,62 @@ function showProfileDetail(profile) {
     gallery.append(createPhotoPlaceholder(profile.name));
   }
 
+  const actions = document.createElement("div");
+  actions.className = "reaction-actions";
+
+  const dislikeButton = createTextElement(
+    "button",
+    "button button-secondary",
+    "Pasar",
+  );
+  dislikeButton.type = "button";
+
+  const likeButton = createTextElement(
+    "button",
+    "button button-primary",
+    "Me interesa",
+  );
+  likeButton.type = "button";
+
+  const handleDetailReaction = async (type, button) => {
+    dislikeButton.disabled = true;
+    likeButton.disabled = true;
+    const saved = await submitReaction(profile, type, button, {
+      refreshDiscovery: false,
+    });
+    if (saved) {
+      const cardInSearch = searchResults.querySelector(
+        `[data-student-id="${CSS.escape(profile.student_id)}"]`,
+      );
+      cardInSearch?.remove();
+      if (!searchResults.querySelector(".profile-card")) {
+        searchResults.replaceChildren(
+          createTextElement(
+            "p",
+            "empty-state",
+            "No quedan más perfiles en este resultado de búsqueda.",
+          ),
+        );
+      }
+      hideProfileDetail();
+      document.getElementById("search-form").scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+    } else {
+      dislikeButton.disabled = false;
+      likeButton.disabled = false;
+    }
+  };
+
+  dislikeButton.addEventListener("click", () =>
+    handleDetailReaction("dislike", dislikeButton),
+  );
+  likeButton.addEventListener("click", () =>
+    handleDetailReaction("like", likeButton),
+  );
+  actions.append(dislikeButton, likeButton);
+
   const information = document.createElement("div");
   information.className = "profile-detail-information";
   information.append(
@@ -131,6 +188,7 @@ function showProfileDetail(profile) {
         ? profile.interests.join(", ")
         : "Sin intereses registrados",
     ),
+    actions,
   );
   content.replaceChildren(gallery, information);
   searchForm.hidden = true;
@@ -179,6 +237,7 @@ function showStudentHeader(profile) {
 function createProfileCard(profile, options = {}) {
   const card = document.createElement("article");
   card.className = `profile-card${options.showReactions ? " discovery-card" : ""}`;
+  card.dataset.studentId = profile.student_id;
   const primaryPhotoUrl = profilePhotos(profile)[0];
   if (primaryPhotoUrl) {
     const photo = document.createElement("img");
@@ -262,7 +321,8 @@ function createProfileCard(profile, options = {}) {
   return card;
 }
 
-async function submitReaction(profile, type, button) {
+async function submitReaction(profile, type, button, options = {}) {
+  const { refreshDiscovery = true } = options;
   button.disabled = true;
   const message = document.getElementById("app-message");
   try {
@@ -277,10 +337,14 @@ async function submitReaction(profile, type, button) {
         : "Reacción guardada. Puedes seguir explorando.",
       "success",
     );
-    await loadDiscovery();
+    if (refreshDiscovery) {
+      await loadDiscovery();
+    }
+    return true;
   } catch (error) {
     showMessage(message, error.message, "error");
     button.disabled = false;
+    return false;
   }
 }
 
@@ -539,6 +603,12 @@ function initializeIndexPage() {
   const loginPanel = document.getElementById("login-panel");
   const application = document.getElementById("application");
   const loginForm = document.getElementById("login-form");
+  const registerForm = document.getElementById("register-form");
+  const toggleAuthButton = document.getElementById("toggle-auth-mode");
+  const loginTitle = document.getElementById("login-title");
+  const authEyebrow = document.getElementById("auth-eyebrow");
+  const authSubtitle = document.getElementById("auth-subtitle");
+  const demoHint = document.getElementById("demo-hint");
   const loginMessage = document.getElementById("login-message");
   const appMessage = document.getElementById("app-message");
 
@@ -548,6 +618,38 @@ function initializeIndexPage() {
     showStudentHeader(profile);
     showView("discover");
   }
+
+  async function completeAuthentication(result, formElement) {
+    state.token = result.access_token;
+    state.studentId = result.student.id;
+    localStorage.setItem(TOKEN_KEY, state.token);
+    formElement.reset();
+    showMessage(loginMessage, "");
+    showMessage(appMessage, "");
+    showApplication(result.student);
+    const profile = await apiRequest("/profiles/me");
+    state.studentId = profile.student_id;
+    showStudentHeader(profile);
+  }
+
+  function setAuthMode(isRegistering) {
+    loginForm.hidden = isRegistering;
+    registerForm.hidden = !isRegistering;
+    authEyebrow.textContent = isRegistering ? "Nuevo estudiante" : "Bienvenido";
+    loginTitle.textContent = isRegistering ? "Crea tu cuenta" : "Inicia sesión";
+    authSubtitle.textContent = isRegistering
+      ? "Completa tus datos para crear tu perfil universitario."
+      : "Ingresa con una cuenta existente o crea una nueva para explorar.";
+    toggleAuthButton.textContent = isRegistering
+      ? "Ya tengo cuenta"
+      : "Crear cuenta";
+    demoHint.hidden = isRegistering;
+    showMessage(loginMessage, "");
+  }
+
+  toggleAuthButton?.addEventListener("click", () => {
+    setAuthMode(!loginForm.hidden);
+  });
 
   loginForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -563,15 +665,64 @@ function initializeIndexPage() {
           password: formData.get("password"),
         },
       });
-      state.token = result.access_token;
-      state.studentId = result.student.id;
-      localStorage.setItem(TOKEN_KEY, state.token);
-      loginForm.reset();
-      showMessage(loginMessage, "");
-      showMessage(appMessage, "");
-      showApplication(result.student);
-      const profile = await apiRequest("/profiles/me");
-      showStudentHeader(profile);
+      await completeAuthentication(result, loginForm);
+    } catch (error) {
+      if (state.token) {
+        showMessage(appMessage, error.message, "error");
+      } else {
+        showMessage(loginMessage, error.message, "error");
+      }
+    } finally {
+      submitButton.disabled = false;
+    }
+  });
+
+  registerForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const formData = new FormData(registerForm);
+    const email = String(formData.get("email") || "").trim().toLowerCase();
+    const password = String(formData.get("password") || "");
+    const allowedDomains = ["@gmail.com", "@hotmail.com"];
+
+    if (!allowedDomains.some((domain) => email.endsWith(domain))) {
+      showMessage(
+        loginMessage,
+        "El correo debe terminar en @gmail.com o @hotmail.com.",
+        "error",
+      );
+      return;
+    }
+
+    if (password.length < 8) {
+      showMessage(
+        loginMessage,
+        "La contraseña debe tener al menos 8 caracteres.",
+        "error",
+      );
+      return;
+    }
+
+    const submitButton = registerForm.querySelector('button[type="submit"]');
+    submitButton.disabled = true;
+    showMessage(loginMessage, "Creando cuenta...");
+    try {
+      const interests = String(formData.get("interests") || "")
+        .split(",")
+        .map((interest) => interest.trim())
+        .filter(Boolean);
+      const result = await apiRequest("/auth/register", {
+        method: "POST",
+        body: {
+          name: formData.get("name"),
+          email,
+          password,
+          faculty: formData.get("faculty"),
+          campus: formData.get("campus"),
+          biography: formData.get("biography"),
+          interests,
+        },
+      });
+      await completeAuthentication(result, registerForm);
     } catch (error) {
       if (state.token) {
         showMessage(appMessage, error.message, "error");
@@ -624,6 +775,7 @@ function initializeIndexPage() {
   });
   document.getElementById("logout-button").addEventListener("click", () => {
     clearSession();
+    setAuthMode(false);
     application.hidden = true;
     loginPanel.hidden = false;
     showMessage(loginMessage, "Sesión cerrada en este navegador.", "success");
